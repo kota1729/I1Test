@@ -31,6 +31,10 @@ function hideLoading() {
         document.getElementById('loading-overlay').classList.remove('active');
     }
 }
+function updateLoadingText(text) {
+    const el = document.getElementById('loading-overlay-text');
+    if (el) el.innerText = text;
+}
 
 function notifySyncError(what) {
     const wrap = document.getElementById('sync-toast-wrap');
@@ -44,6 +48,19 @@ function notifySyncError(what) {
         toast.classList.remove('show');
         setTimeout(() => toast.remove(), 300);
     }, 4000);
+}
+
+// 通信状況が極端に悪い場合に、画面が「一生」固まって見えることを防ぐための
+// タイムアウト付きラッパー。指定時間内に処理が終わらなければエラーとして
+// reject するので、呼び出し側でエラー表示・再試行に繋げられる。
+function withTimeout(promise, ms, timeoutMessage) {
+    let timerId;
+    const timeout = new Promise((_, reject) => {
+        timerId = setTimeout(() => {
+            reject(new Error(timeoutMessage || `処理がタイムアウトしました（${ms / 1000}秒）`));
+        }, ms);
+    });
+    return Promise.race([promise, timeout]).finally(() => clearTimeout(timerId));
 }
 
 // Firebase Authenticationはメール形式のIDを要求するため、
@@ -497,10 +514,18 @@ async function handleLogin() {
         // パスワードの検証はFirebase Authenticationがサーバー側で安全に行う。
         // Firestoreからパスワードを読み取って比較するようなことは一切しない。
         const email = usernameToEmail(uid);
-        const cred = await auth.signInWithEmailAndPassword(email, pw);
+        const cred = await withTimeout(
+            auth.signInWithEmailAndPassword(email, pw),
+            15000,
+            "ログイン処理がタイムアウトしました。通信環境をご確認のうえ、もう一度お試しください。"
+        );
         const authUid = cred.user.uid;
 
-        const adminUid = await getAdminUid();
+        const adminUid = await withTimeout(
+            getAdminUid(),
+            10000,
+            "サーバーとの通信がタイムアウトしました。通信環境をご確認のうえ、もう一度お試しください。"
+        );
         const isAdmin = (adminUid === authUid);
 
         currentUser = authUid;
@@ -510,10 +535,17 @@ async function handleLogin() {
         // ★とメモを先に読み込んでキャッシュしておくことで、この後の
         // 画面遷移（教科選択・メニュー・出題など）を通信待ちなしで
         // 一瞬で表示できるようにする。
+        // ※ここでは showLoading() を再度呼ばない（呼ぶとオーバーレイの
+        //   表示カウンターがずれて、処理完了後もオーバーレイが消えなくなる
+        //   ため）。表示中のテキストだけ更新する。
         btn.innerText = 'データを準備中...';
-        showLoading('データを準備中...');
+        updateLoadingText('データを準備中...');
         resetSessionCache();
-        await loadSessionData();
+        await withTimeout(
+            loadSessionData(),
+            10000,
+            "データの読み込みがタイムアウトしました。通信環境をご確認のうえ、もう一度お試しください。"
+        );
 
         hideLoading();
         showSubjectScreen();
@@ -523,7 +555,9 @@ async function handleLogin() {
     } catch (error) {
         hideLoading();
         console.error(error);
-        if (error.code === 'auth/too-many-requests') {
+        if (error && error.message && error.message.includes('タイムアウト')) {
+            await showCustomAlert(error.message, "通信エラー");
+        } else if (error.code === 'auth/too-many-requests') {
             await showCustomAlert("試行回数が多すぎます。しばらく待ってから再度お試しください。", "ログインエラー");
         } else {
             // セキュリティ上（他人のIDが実在するかどうかを外部から調べられないようにするため）、
