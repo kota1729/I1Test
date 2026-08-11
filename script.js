@@ -19,21 +19,47 @@ const auth = firebase.auth();
 // 通信が発生する処理の前後で呼び出し、画面が固まったように見える
 // ことがないようにする。
 let loadingDepth = 0;
+let loadingStuckTimer = null;
+// このミリ秒数、オーバーレイが消えないまま表示され続けたら、
+// 「通信に時間がかかっています」というヒント（＋再読み込みボタン）を出す。
+// これは個々の処理にタイムアウトを付け忘れていた場合でも、
+// 画面がずっと固まって見えることが絶対に無いようにするための保険。
+const LOADING_STUCK_HINT_MS = 7000;
+
 function showLoading(text = '処理中...') {
     loadingDepth++;
     const el = document.getElementById('loading-overlay');
     document.getElementById('loading-overlay-text').innerText = text;
     el.classList.add('active');
+    armLoadingStuckTimer();
 }
 function hideLoading() {
     loadingDepth = Math.max(0, loadingDepth - 1);
     if (loadingDepth === 0) {
         document.getElementById('loading-overlay').classList.remove('active');
+        disarmLoadingStuckTimer();
     }
 }
 function updateLoadingText(text) {
     const el = document.getElementById('loading-overlay-text');
     if (el) el.innerText = text;
+    // 新しい処理段階に進んだとみなし、固まり判定タイマーを仕切り直す。
+    armLoadingStuckTimer();
+}
+function armLoadingStuckTimer() {
+    disarmLoadingStuckTimer();
+    loadingStuckTimer = setTimeout(() => {
+        const hintEl = document.getElementById('loading-overlay-hint');
+        if (hintEl) hintEl.classList.add('show');
+    }, LOADING_STUCK_HINT_MS);
+}
+function disarmLoadingStuckTimer() {
+    if (loadingStuckTimer) {
+        clearTimeout(loadingStuckTimer);
+        loadingStuckTimer = null;
+    }
+    const hintEl = document.getElementById('loading-overlay-hint');
+    if (hintEl) hintEl.classList.remove('show');
 }
 
 function notifySyncError(what) {

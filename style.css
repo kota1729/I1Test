@@ -658,6 +658,53 @@ h1 {
     font-weight: bold;
 }
 
+/* 一定時間経っても処理中オーバーレイが消えない場合に表示するヒント */
+.loading-overlay-hint {
+    display: none;
+    max-width: 320px;
+    text-align: center;
+    background: #fff;
+    border: 1px solid #e1e8ed;
+    border-radius: 8px;
+    padding: 14px 16px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    animation: loading-hint-fade-in 0.25s ease;
+}
+
+.loading-overlay-hint.show {
+    display: block;
+}
+
+.loading-overlay-hint p {
+    font-size: 12.5px;
+    color: #555;
+    line-height: 1.7;
+    margin-bottom: 12px;
+}
+
+.loading-overlay-hint-btns {
+    display: flex;
+    justify-content: center;
+}
+
+.loading-overlay-hint-btns .btn {
+    flex: none;
+    padding: 8px 16px;
+    font-size: 12px;
+}
+
+@keyframes loading-hint-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 /* 保存に失敗した時などに軽く知らせるトースト通知 */
 .sync-toast-wrap {
     position: fixed;
