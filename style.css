@@ -240,13 +240,43 @@ h1 {
     font-weight: bold;
     font-size: 14px;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 2px;
     box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.1);
     user-select: none;
     transition: transform 0.3s ease, opacity 0.2s;
     padding: 10px;
     text-align: center;
+}
+
+.fusen-icon {
+    font-size: 20px;
+    line-height: 1;
+    animation: fusen-tap-hint 1.4s ease-in-out infinite;
+}
+
+.fusen-main {
+    font-size: 14px;
+}
+
+.fusen-sub {
+    font-size: 10px;
+    font-weight: normal;
+    opacity: 0.85;
+}
+
+@keyframes fusen-tap-hint {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(4px);
+    }
 }
 
 .a-container.revealed .a-text {
@@ -472,6 +502,16 @@ h1 {
 
 .memo-textarea::placeholder {
     color: #c3c9c0;
+}
+
+.bulk-actions {
+    margin-bottom: 15px;
+}
+
+.bulk-actions .btn {
+    width: 100%;
+    font-size: 14px;
+    padding: 13px;
 }
 
 #list-container {

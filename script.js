@@ -857,6 +857,40 @@ function toggleStarCurrent() {
 
 function toggleAnswer(containerEl) {
     containerEl.classList.toggle('revealed');
+    // 一覧画面（まとめて出題）内の付箋なら、個別に開閉した後も
+    // 「まとめてめくる/閉じる」ボタンの表示を現状に合わせて更新する。
+    if (containerEl.closest('#list-container')) {
+        updateBulkToggleBtnLabel();
+    }
+}
+
+// まとめて出題（一覧めくり方式）で、表示中の付箋を一括でめくる/閉じるボタンの処理。
+// 半分以上が開いていれば「まとめて閉じる」、そうでなければ「まとめてめくる」動作にする。
+function toggleAllAnswers() {
+    const containers = document.querySelectorAll('#list-container .a-container');
+    if (containers.length === 0) return;
+
+    const revealedCount = document.querySelectorAll('#list-container .a-container.revealed').length;
+    const shouldReveal = revealedCount < containers.length / 2;
+
+    containers.forEach(el => {
+        el.classList.toggle('revealed', shouldReveal);
+    });
+
+    updateBulkToggleBtnLabel();
+}
+
+function updateBulkToggleBtnLabel() {
+    const btn = document.getElementById('bulk-toggle-btn');
+    if (!btn) return;
+    const containers = document.querySelectorAll('#list-container .a-container');
+    const revealedCount = document.querySelectorAll('#list-container .a-container.revealed').length;
+
+    if (containers.length > 0 && revealedCount === containers.length) {
+        btn.innerText = '🙈 付箋をまとめて閉じる';
+    } else {
+        btn.innerText = '👆 付箋をまとめてめくって答えを見る';
+    }
 }
 
 async function nextQuestion() {
@@ -897,7 +931,10 @@ async function setupListScreen() {
                         </div>
                         <div class="a-container" onclick="toggleAnswer(this)">
                             <div class="a-text">${item.a}</div>
-                            <div class="fusen">タップして付箋をめくる</div>
+                            <div class="fusen">
+                                <span class="fusen-icon">👆</span>
+                                <span class="fusen-main">タップして答えを見る</span>
+                            </div>
                         </div>
                         <div class="memo-box">
                             <div class="memo-header">
@@ -912,6 +949,7 @@ async function setupListScreen() {
     });
 
     container.innerHTML = htmlParts.join('');
+    updateBulkToggleBtnLabel();
 }
 
 function onListMemoInput(idx) {

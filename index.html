@@ -4,8 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>一問一答 クイズシステム Pro</title>
+    <title>I1テスト対策サイト</title>
     <link rel="stylesheet" href="style.css">
+    <meta name="description" content="このサイトはI1のテスト対策サイトとなっています。">
 </head>
 
 <body>
@@ -148,8 +149,11 @@
             </div>
             <div class="a-container" id="quiz-a-container" onclick="toggleAnswer(this)">
                 <div class="a-text" id="quiz-answer">正解データ</div>
-                <div class="fusen">タップして付箋をめくる<br><span
-                        style="font-size:10px; font-weight:normal; opacity:0.8;">(もう一度タップで戻せます)</span></div>
+                <div class="fusen">
+                    <span class="fusen-icon">👆</span>
+                    <span class="fusen-main">タップして答えを見る</span>
+                    <span class="fusen-sub">(もう一度タップで隠せます)</span>
+                </div>
             </div>
         </div>
 
@@ -173,6 +177,10 @@
     <div class="window" id="list-screen">
         <h1 id="list-title">全問一気見リスト</h1>
         <p class="subtitle">付箋をタップすると開閉（めくる・閉じる）ができます。</p>
+
+        <div class="bulk-actions">
+            <button class="btn btn-main" id="bulk-toggle-btn" onclick="toggleAllAnswers()">👆 付箋をまとめてめくって答えを見る</button>
+        </div>
 
         <div id="list-container"></div>
 
@@ -206,7 +214,7 @@
         </div>
 
         <div class="admin-section" style="border-color: var(--accent);">
-            <h3 style="font-size:15px; color:var(--accent); margin-bottom:10px;">⭐ この教科の★（★）を一括リセット</h3>
+            <h3 style="font-size:15px; color:var(--accent); margin-bottom:10px;">⭐ この教科の★（わからない問題）を一括リセット</h3>
             <p style="font-size:12px; color:#7f8c8d; margin-bottom:10px;">現在選択中の教科のデータだけが対象です。他の教科の★は影響を受けません。</p>
             <button class="btn btn-danger" onclick="adminResetAllUsersStars()">この教科の★データを全ユーザー一括リセットする</button>
         </div>

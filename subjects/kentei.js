@@ -1,5 +1,5 @@
 (function () {
-    const SUBJECT_ID = "keitei";
+    const SUBJECT_ID = "kentei";
     const SUBJECT_NAME = "情報処理検定1級用語";
     const SUBJECT_ORDER = 2;
 
