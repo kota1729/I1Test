@@ -1,0 +1,23 @@
+{
+  "name": "i1testsite",
+  "version": "1.0.0",
+  "description": "",
+  "main": "script.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kota1729/I1Test.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/kota1729/I1Test/issues"
+  },
+  "homepage": "https://github.com/kota1729/I1Test#readme",
+  "dependencies": {
+    "firebase-admin": "^14.3.0"
+  }
+}

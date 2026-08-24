@@ -1015,33 +1015,11 @@ async function showAdminScreen() {
                     <td><span style="color:#7f8c8d;">🔒 非公開（暗号化済み）</span></td>
                     <td>${starCount} 問</td>
                     <td>
-                        <button class="btn btn-sub" style="padding:5px 8px; font-size:11px; margin-bottom:4px;" onclick="adminResetUserStars('${uid}', '${username}')">★リセット</button>
-                        ${isSelf ? '' : `<button class="btn btn-danger" style="padding:5px 10px; font-size:12px;" onclick="adminDeleteUser('${uid}', '${username}')">削除</button>`}
+                        <button class="btn btn-sub" style="padding:5px 8px; font-size:11px;" onclick="adminResetUserStars('${uid}', '${username}')">★リセット</button>
                     </td>
                 `;
         tbody.appendChild(tr);
     });
-}
-
-async function adminDeleteUser(uid, username) {
-    if (!isAdminSession) return;
-    if (uid === currentUser) {
-        await showCustomAlert("管理者自身のデータは、この画面からは削除できません。", "エラー");
-        return;
-    }
-
-    if (uid === currentUser) {
-        await showCustomAlert("管理者自身のデータは、この画面からは削除できません。", "操作エラー");
-        return;
-    }
-
-    const confirmed = await showCustomConfirm(`管理者権限で ユーザー「${username}」のデータ（すべての教科分）を完全に削除しますか？\n※ログインアカウント自体（ID・パスワード）は削除されないため、本人が再ログインすると、データが空の状態で新しいアカウントとして使い続けられます。`, "ユーザー強制削除");
-    if (confirmed) {
-        showLoading('削除中...');
-        await db.collection('users').doc(uid).delete();
-        hideLoading();
-        await showAdminScreen();
-    }
 }
 
 async function adminResetUserStars(uid, username) {
