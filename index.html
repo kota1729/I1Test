@@ -36,9 +36,9 @@
         <h1>一問一答システム ログイン</h1>
         <p class="subtitle">ログインするか、新しいアカウントを作成してください。</p>
         <div class="auth-form">
-            <input type="text" id="auth-userid" placeholder="ユーザーID">
+            <input type="text" id="auth-userid" placeholder="ユーザーID" autocomplete="off">
             <div class="password-wrapper">
-                <input type="password" id="auth-password" placeholder="パスワード">
+                <input type="password" id="auth-password" placeholder="パスワード" autocomplete="off">
                 <button type="button" class="toggle-pw-btn" onclick="toggleAuthPasswordVisibility(this)">表示</button>
             </div>
         </div>
@@ -196,7 +196,7 @@
 
     <div class="window" id="admin-screen">
         <h1>管理者管理パネル</h1>
-        <p class="subtitle">現在の教科「<strong id="admin-subject-name">--</strong>」について、登録されているユーザーのID確認・★リセット・削除が行えます。</p>
+        <p class="subtitle">現在の教科「<strong id="admin-subject-name">--</strong>」について、登録されているユーザーのID確認・★リセットが行えます。</p>
 
         <button class="btn btn-sub" onclick="showAdminScreen()" style="width:100%; margin-bottom:15px; font-size:13px;">
             🔄 最新の状態に更新

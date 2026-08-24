@@ -506,6 +506,10 @@ async function handleRegister() {
 
         await auth.signOut();
 
+        hideLoading();
+        btn.disabled = false;
+        btn.innerText = originalLabel;
+
         await showCustomAlert("アカウントを作成しました！ログインしてください。", "登録完了");
         showLoginScreen();
     } catch (error) {
