@@ -933,7 +933,7 @@ async function setupListScreen() {
                             <div class="a-text">${item.a}</div>
                             <div class="fusen">
                                 <span class="fusen-icon">👆</span>
-                                <span class="fusen-main">タップして答えを見る</span>
+                                <span class="fusen-main">付箋をタップして答えを見る</span>
                             </div>
                         </div>
                         <div class="memo-box">
