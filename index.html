@@ -54,6 +54,9 @@
         <h1>新規アカウント登録</h1>
         <p class="subtitle">新しいユーザーIDとパスワードを設定してください。</p>
         <div class="auth-form">
+            <select id="register-attendance-number">
+                <option value="">出席番号を選択してください</option>
+            </select>
             <input type="text" id="register-userid" placeholder="新しいユーザーID（半角英数字と_-、3〜20文字）">
             <div class="password-wrapper">
                 <input type="password" id="register-password" placeholder="新しいパスワード"
@@ -157,13 +160,16 @@
         </div>
 
         <div class="memo-box">
-            <div class="memo-header">
+            <div class="memo-header" onclick="toggleMemoVisibility()" style="cursor:pointer;">
                 <span class="memo-header-icon">✎</span>
                 <span class="memo-header-text">メモ</span>
                 <span class="memo-status" id="quiz-memo-status"></span>
+                <span class="memo-toggle-label" id="memo-toggle-label" style="font-size:11px; color:#7a9284;">タップして表示</span>
             </div>
-            <textarea class="memo-textarea" id="quiz-memo" placeholder="気づいたこと・覚え方のコツなどを書いておこう"
-                oninput="onQuizMemoInput()" onblur="saveQuizMemoNow()"></textarea>
+            <div class="memo-content" id="memo-content" style="display:none;">
+                <textarea class="memo-textarea" id="quiz-memo" placeholder="気づいたこと・覚え方のコツなどを書いておこう"
+                    oninput="onQuizMemoInput()" onblur="saveQuizMemoNow()"></textarea>
+            </div>
         </div>
 
         <div class="control-btns">
@@ -206,6 +212,7 @@
             <table class="admin-table">
                 <thead>
                     <tr>
+                        <th>出席番号</th>
                         <th>ユーザーID</th>
                         <th>パスワード</th>
                         <th>★の数</th>

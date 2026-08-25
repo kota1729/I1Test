@@ -213,6 +213,8 @@ function updatePasswordRuleStatus() {
 function showRegisterScreen() {
     document.querySelectorAll('.window').forEach(el => el.style.display = 'none');
     document.getElementById('register-screen').style.display = 'block';
+    populateAttendanceNumberOptions();
+    document.getElementById('register-attendance-number').value = '';
     document.getElementById('register-userid').value = '';
     document.getElementById('register-password').value = '';
     updatePasswordRuleStatus();
@@ -452,9 +454,25 @@ function scheduleMemoSave(key, saveFn, statusElId) {
     }, 700);
 }
 
+function populateAttendanceNumberOptions() {
+    const select = document.getElementById('register-attendance-number');
+    if (!select || select.dataset.populated) return;
+    for (let i = 1; i <= 40; i++) {
+        const option = document.createElement('option');
+        option.value = i;
+        option.textContent = i + '番';
+        select.appendChild(option);
+    }
+    select.dataset.populated = 'true';
+}
+
 async function handleRegister() {
+    populateAttendanceNumberOptions();
+    const attendanceNumber = document.getElementById('register-attendance-number').value;
     const uid = document.getElementById('register-userid').value.trim();
     const pw = document.getElementById('register-password').value.trim();
+
+    if (!attendanceNumber) { await showCustomAlert("出席番号を選択してください。", "入力エラー"); return; }
 
     if (!uid || !pw) { await showCustomAlert("ユーザーIDとパスワードを入力してください。", "入力エラー"); return; }
 
@@ -481,6 +499,17 @@ async function handleRegister() {
     showLoading('登録中...');
 
     try {
+        const existingSnapshot = await db.collection('users')
+            .where('attendanceNumber', '==', Number(attendanceNumber))
+            .get();
+        if (!existingSnapshot.empty) {
+            hideLoading();
+            btn.disabled = false;
+            btn.innerText = originalLabel;
+            await showCustomAlert("その出席番号は、すでに別のアカウントで登録されています。心当たりがない場合は、管理者に直接ご確認ください。", "登録エラー");
+            return;
+        }
+
         // パスワードはFirestoreには一切保存せず、Firebase Authenticationに
         // 安全に管理させる（ユーザーIDはダミーのメールアドレスに変換して使用）。
         const email = usernameToEmail(uid);
@@ -488,6 +517,7 @@ async function handleRegister() {
 
         await db.collection('users').doc(cred.user.uid).set({
             username: uid,
+            attendanceNumber: Number(attendanceNumber),
             starred: {}
         });
 
@@ -807,6 +837,10 @@ async function showQuestion() {
         memoStatusEl.textContent = '';
         memoStatusEl.classList.remove('saved');
     }
+    const memoContentEl = document.getElementById('memo-content');
+    const memoToggleLabelEl = document.getElementById('memo-toggle-label');
+    if (memoContentEl) memoContentEl.style.display = 'none';
+    if (memoToggleLabelEl) memoToggleLabelEl.textContent = 'タップして表示';
 
     const total = activeQuestions.length;
     document.getElementById('quiz-count').innerText = `第 ${currentIndex + 1} 問 / ${total} 問`;
@@ -814,6 +848,14 @@ async function showQuestion() {
 
     const prevBtn = document.getElementById('prev-btn');
     prevBtn.disabled = (currentIndex === 0);
+}
+
+function toggleMemoVisibility() {
+    const content = document.getElementById('memo-content');
+    const label = document.getElementById('memo-toggle-label');
+    const isHidden = content.style.display === 'none';
+    content.style.display = isHidden ? 'block' : 'none';
+    label.textContent = isHidden ? 'タップして隠す' : 'タップして表示';
 }
 
 function onQuizMemoInput() {
@@ -996,25 +1038,27 @@ async function showAdminScreen() {
     document.getElementById('admin-new-password').value = '';
 
     const tbody = document.getElementById('admin-user-list');
-    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#aaa;">読み込み中...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#aaa;">読み込み中...</td></tr>`;
 
     let users = await getUsersData();
     const keys = Object.keys(users);
 
     if (keys.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#aaa;">登録されているユーザーはいません。</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#aaa;">登録されているユーザーはいません。</td></tr>`;
         return;
     }
 
     tbody.innerHTML = '';
     keys.forEach(uid => {
         const username = escapeHtml(users[uid].username || '(不明なユーザー)');
+        const attendanceNumber = users[uid].attendanceNumber || '--';
         const starred = users[uid].starred;
         const starArr = (starred && typeof starred === 'object' && !Array.isArray(starred)) ? (starred[currentSubject] || []) : [];
         const starCount = starArr.length;
         const isSelf = (uid === currentUser);
         const tr = document.createElement('tr');
         tr.innerHTML = `
+                    <td>${attendanceNumber}番</td>
                     <td><strong>${username}</strong>${isSelf ? ' <span style="color:#8e44ad; font-size:11px;">（自分＝管理者）</span>' : ''}</td>
                     <td><span style="color:#7f8c8d;">🔒 非公開（暗号化済み）</span></td>
                     <td>${starCount} 問</td>

@@ -60,6 +60,7 @@ h1 {
 }
 
 .auth-form input,
+.auth-form select,
 .admin-change-pw-form input {
     padding: 12px;
     border: 1px solid #ddd;
