@@ -258,6 +258,18 @@ async function submitPasswordResetRequest() {
     showLoading('送信中...');
 
     try {
+        const dirDoc = await db.collection('system').doc('attendanceDirectory').get();
+        const directory = dirDoc.exists ? (dirDoc.data().directory || {}) : {};
+        const registeredUserid = directory[String(attendanceNumber)];
+
+        if (!registeredUserid || registeredUserid !== userid) {
+            hideLoading();
+            btn.disabled = false;
+            btn.innerText = originalLabel;
+            await showCustomAlert("出席番号とユーザーIDの組み合わせが確認できませんでした。入力内容をご確認ください。", "確認エラー");
+            return;
+        }
+
         await db.collection('passwordResetRequests').add({
             attendanceNumber: Number(attendanceNumber),
             userid: userid,
@@ -574,8 +586,18 @@ async function handleRegister() {
     showLoading('登録中...');
 
     try {
-        const takenDoc = await db.collection('system').doc('takenAttendanceNumbers').get();
-        const takenNumbers = takenDoc.exists ? (takenDoc.data().numbers || []) : [];
+        let takenNumbers = [];
+        try {
+            const takenDoc = await db.collection('system').doc('takenAttendanceNumbers').get();
+            takenNumbers = takenDoc.exists ? (takenDoc.data().numbers || []) : [];
+        } catch (checkError) {
+            console.error("出席番号の重複確認に失敗しました:", checkError);
+            hideLoading();
+            btn.disabled = false;
+            btn.innerText = originalLabel;
+            await showCustomAlert("出席番号の確認に失敗しました。Firestoreのセキュリティルールで system/takenAttendanceNumbers への read 権限が正しく設定されているか、管理者に確認してもらってください。（エラー内容: " + checkError.message + "）", "登録エラー");
+            return;
+        }
         if (takenNumbers.map(Number).includes(Number(attendanceNumber))) {
             hideLoading();
             btn.disabled = false;
@@ -600,6 +622,12 @@ async function handleRegister() {
         // 未ログイン状態から読めない設定になっているため）。
         await db.collection('system').doc('takenAttendanceNumbers').set({
             numbers: firebase.firestore.FieldValue.arrayUnion(Number(attendanceNumber))
+        }, { merge: true });
+
+        // パスワード再設定リクエスト時に「出席番号とユーザーIDが本当に一致しているか」を
+        // 未ログイン状態からでも確認できるよう、対応表も公開ドキュメントに記録しておく。
+        await db.collection('system').doc('attendanceDirectory').set({
+            directory: { [String(attendanceNumber)]: uid }
         }, { merge: true });
 
         // system/admin ドキュメントに adminUid がまだ設定されていない場合
@@ -1112,12 +1140,12 @@ function toggleStarList(originalIdx, btnEl) {
 async function loadPasswordResetRequests() {
     const tbody = document.getElementById('reset-requests-list');
     if (!tbody) return;
-    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#aaa;">読み込み中...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#aaa;">読み込み中...</td></tr>`;
 
     try {
         const snapshot = await db.collection('passwordResetRequests').orderBy('createdAt', 'desc').get();
         if (snapshot.empty) {
-            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#aaa;">現在、リクエストはありません。</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#aaa;">現在、リクエストはありません。</td></tr>`;
             return;
         }
         tbody.innerHTML = '';
@@ -1130,7 +1158,10 @@ async function loadPasswordResetRequests() {
                 <td>${escapeHtml(String(data.attendanceNumber))}番</td>
                 <td>${escapeHtml(data.userid)}</td>
                 <td>
-                    <button class="btn btn-sub" style="padding:5px 8px; font-size:11px;" onclick="markResetRequestHandled('${doc.id}')">対応済みにする</button>
+                    <button class="btn btn-main" style="padding:5px 8px; font-size:11px; background:#27ae60;" onclick="resolveResetRequest('${doc.id}', true)">許可</button>
+                </td>
+                <td>
+                    <button class="btn btn-danger" style="padding:5px 8px; font-size:11px;" onclick="resolveResetRequest('${doc.id}', false)">拒否</button>
                 </td>
             `;
             tbody.appendChild(tr);
@@ -1141,15 +1172,18 @@ async function loadPasswordResetRequests() {
     }
 }
 
-async function markResetRequestHandled(requestId) {
-    const confirmed = await showCustomConfirm("このリクエストを、対応済みとして一覧から削除しますか？", "対応済みにする");
+async function resolveResetRequest(requestId, approved) {
+    const confirmText = approved
+        ? "このリクエストを「許可」しますか？（本人確認が済んでいることを確認してから許可してください。実際のパスワード変更は、別途手元のスクリプトで行ってください。）"
+        : "このリクエストを「拒否」しますか？（一覧から削除されます。）";
+    const confirmed = await showCustomConfirm(confirmText, approved ? "リクエストを許可" : "リクエストを拒否");
     if (!confirmed) return;
     try {
         await db.collection('passwordResetRequests').doc(requestId).delete();
         await loadPasswordResetRequests();
     } catch (error) {
         console.error(error);
-        await showCustomAlert("削除に失敗しました。", "エラー");
+        await showCustomAlert("処理に失敗しました。", "エラー");
     }
 }
 
