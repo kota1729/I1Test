@@ -68,6 +68,11 @@ h1 {
     font-size: 15px;
 }
 
+#register-attendance-number option:disabled {
+    color: #bbb;
+    background-color: #f0f0f0;
+}
+
 .password-wrapper {
     position: relative;
 }

@@ -210,14 +210,13 @@ function updatePasswordRuleStatus() {
     }
 }
 
-function showRegisterScreen() {
+async function showRegisterScreen() {
     document.querySelectorAll('.window').forEach(el => el.style.display = 'none');
     document.getElementById('register-screen').style.display = 'block';
-    populateAttendanceNumberOptions();
-    document.getElementById('register-attendance-number').value = '';
     document.getElementById('register-userid').value = '';
     document.getElementById('register-password').value = '';
     updatePasswordRuleStatus();
+    await populateAttendanceNumberOptions();
 }
 
 function showLoginScreen() {
@@ -324,8 +323,11 @@ async function getUserStars(uid, subjectId) {
     return data.starred[subjectId] || [];
 }
 
-async function setUserStars(uid, subjectId, starsArray) {
-    await db.collection('users').doc(uid).set({ starred: { [subjectId]: starsArray } }, { merge: true });
+async function setUserStars(uid, subjectId, starsArray, isTargetAdmin) {
+    // 管理者自身のデータは 'stars' フィールドに保存されるため（setSessionStars参照）、
+    // リセット対象が管理者自身の場合はそちらに合わせて書き込む。
+    const field = isTargetAdmin ? 'stars' : 'starred';
+    await db.collection('users').doc(uid).set({ [field]: { [subjectId]: starsArray } }, { merge: true });
 }
 
 async function getAdminDoc() {
@@ -454,20 +456,45 @@ function scheduleMemoSave(key, saveFn, statusElId) {
     }, 700);
 }
 
-function populateAttendanceNumberOptions() {
+async function populateAttendanceNumberOptions() {
     const select = document.getElementById('register-attendance-number');
-    if (!select || select.dataset.populated) return;
+    if (!select) return;
+
+    select.innerHTML = '<option value="">読み込み中...</option>';
+    select.disabled = true;
+
+    const takenNumbers = new Set();
+    try {
+        const snapshot = await db.collection('users').get();
+        snapshot.forEach(doc => {
+            const num = doc.data().attendanceNumber;
+            if (num !== undefined && num !== null) takenNumbers.add(Number(num));
+        });
+    } catch (error) {
+        console.error("出席番号の取得に失敗しました:", error);
+    }
+
+    select.innerHTML = '';
+    const defaultOption = document.createElement('option');
+    defaultOption.value = '';
+    defaultOption.textContent = '出席番号を選択してください';
+    select.appendChild(defaultOption);
+
     for (let i = 1; i <= 39; i++) {
         const option = document.createElement('option');
         option.value = i;
-        option.textContent = i + '番';
+        if (takenNumbers.has(i)) {
+            option.textContent = i + '番（登録済み）';
+            option.disabled = true;
+        } else {
+            option.textContent = i + '番';
+        }
         select.appendChild(option);
     }
-    select.dataset.populated = 'true';
+    select.disabled = false;
 }
 
 async function handleRegister() {
-    populateAttendanceNumberOptions();
     const attendanceNumber = document.getElementById('register-attendance-number').value;
     const uid = document.getElementById('register-userid').value.trim();
     const pw = document.getElementById('register-password').value.trim();
@@ -1052,10 +1079,12 @@ async function showAdminScreen() {
     keys.forEach(uid => {
         const username = escapeHtml(users[uid].username || '(不明なユーザー)');
         const attendanceNumber = users[uid].attendanceNumber || '--';
-        const starred = users[uid].starred;
+        const isSelf = (uid === currentUser);
+        // 管理者自身のデータは 'stars' フィールドに保存されるため（setSessionStars参照）、
+        // 通常ユーザーの 'starred' フィールドとは別に読み分ける必要がある。
+        const starred = isSelf ? users[uid].stars : users[uid].starred;
         const starArr = (starred && typeof starred === 'object' && !Array.isArray(starred)) ? (starred[currentSubject] || []) : [];
         const starCount = starArr.length;
-        const isSelf = (uid === currentUser);
         const tr = document.createElement('tr');
         tr.innerHTML = `
                     <td>${attendanceNumber}番</td>
@@ -1077,7 +1106,9 @@ async function adminResetUserStars(uid, username) {
     const confirmed = await showCustomConfirm(`ユーザー「${username}」の教科「${subjectName}」の★データだけをリセットします。他の教科・他のユーザーには影響しません。よろしいですか？`, "ユーザー別★リセット");
     if (confirmed) {
         showLoading('リセット中...');
-        await setUserStars(uid, currentSubject, []);
+        const isTargetAdmin = (uid === currentUser);
+        await setUserStars(uid, currentSubject, [], isTargetAdmin);
+        if (isTargetAdmin) sessionStars[currentSubject] = [];
         hideLoading();
         await showCustomAlert(`ユーザー「${username}」の★データ（${subjectName}）をリセットしました。`, "リセット完了");
         await showAdminScreen();
