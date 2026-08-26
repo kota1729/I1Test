@@ -340,6 +340,39 @@
         </div>
     </div>
 
+    <div class="window" id="force-change-password-screen">
+        <h1>パスワードの再設定が必要です</h1>
+        <p class="subtitle">管理者から発行された一時パスワードでログインしました。続行するには、新しいパスワードを設定してください。「現在のパスワード」には、今ログインに使った一時パスワードを入力してください。
+        </p>
+        <div class="auth-form">
+            <div class="password-wrapper">
+                <input type="password" id="force-current-password" placeholder="現在のパスワード（一時パスワード）" autocomplete="off">
+                <button type="button" class="toggle-pw-btn"
+                    onclick="toggleChangePasswordVisibility(this, 'force-current-password')">表示</button>
+            </div>
+            <div class="password-wrapper">
+                <input type="password" id="force-new-password" placeholder="新しいパスワード" autocomplete="off"
+                    oninput="updateForceChangePasswordRuleStatus()">
+                <button type="button" class="toggle-pw-btn"
+                    onclick="toggleChangePasswordVisibility(this, 'force-new-password')">表示</button>
+            </div>
+            <div class="pw-rules">
+                <span class="pw-rules-title">パスワードの条件</span>
+                <div class="pw-rule-item" id="force-rule-length"><span class="pw-rule-icon"></span>8文字以上で設定してください</div>
+                <div class="pw-rule-item" id="force-rule-number"><span class="pw-rule-icon"></span>半角の数字（0〜9）を含めてください
+                </div>
+                <div class="pw-rule-item" id="force-rule-alpha"><span class="pw-rule-icon"></span>半角のローマ字（a〜z,
+                    A〜Z）を含めてください</div>
+                <div class="pw-rule-item" id="force-rule-charset"><span
+                        class="pw-rule-icon"></span>使用できるのは半角の英数字のみです（日本語・記号は不可）</div>
+            </div>
+        </div>
+        <div class="control-btns" style="margin-bottom: 15px;">
+            <button class="btn btn-main" id="force-change-password-btn"
+                onclick="handleForceChangePassword()">設定する</button>
+        </div>
+    </div>
+
     <script src="subjects/joho_shori.js"></script>
     <script src="subjects/kentei.js"></script>
 

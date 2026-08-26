@@ -2,3 +2,4 @@
 serviceAccountKey.json
 node_modules
 delete-user.js
+reset-password.js

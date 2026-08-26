@@ -247,6 +247,80 @@ function showChangePasswordScreen() {
     updateChangePasswordRuleStatus();
 }
 
+function showForceChangePasswordScreen() {
+    document.querySelectorAll('.window').forEach(el => el.style.display = 'none');
+    document.getElementById('force-change-password-screen').style.display = 'block';
+    document.getElementById('force-current-password').value = '';
+    document.getElementById('force-new-password').value = '';
+    updateForceChangePasswordRuleStatus();
+}
+
+function updateForceChangePasswordRuleStatus() {
+    const pw = document.getElementById('force-new-password').value;
+
+    const checks = {
+        'force-rule-length': pw.length >= 8,
+        'force-rule-number': PASSWORD_HAS_NUMBER_REGEX.test(pw),
+        'force-rule-alpha': PASSWORD_HAS_ALPHA_REGEX.test(pw),
+        'force-rule-charset': pw.length > 0 && PASSWORD_CHARSET_ONLY_REGEX.test(pw)
+    };
+
+    Object.keys(checks).forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.classList.toggle('valid', checks[id]);
+        el.classList.toggle('invalid', !checks[id]);
+    });
+}
+
+async function handleForceChangePassword() {
+    const currentPw = document.getElementById('force-current-password').value.trim();
+    const newPw = document.getElementById('force-new-password').value.trim();
+
+    if (!currentPw || !newPw) {
+        await showCustomAlert("現在のパスワード（一時パスワード）と、新しいパスワードの両方を入力してください。", "入力エラー");
+        return;
+    }
+
+    if (!isValidPassword(newPw)) {
+        await showCustomAlert(
+            "パスワードの条件を満たしていません。\n・8文字以上\n・半角の数字とローマ字を両方含む\n・使用できるのは半角英数字のみ（日本語・記号は使用不可）",
+            "パスワードエラー"
+        );
+        return;
+    }
+
+    showLoading('設定中...');
+    try {
+        const user = auth.currentUser;
+
+        const credential = firebase.auth.EmailAuthProvider.credential(user.email, currentPw);
+        await user.reauthenticateWithCredential(credential);
+
+        await user.updatePassword(newPw);
+
+        // 変更に成功したら、次回以降は強制画面に飛ばされないよう、フラグを解除する。
+        await db.collection('users').doc(currentUser).update({ mustChangePassword: false });
+
+        hideLoading();
+        await showCustomAlert("パスワードを設定しました。引き続きご利用いただけます。", "設定完了");
+
+        resetSessionCache();
+        await loadSessionData();
+        showSubjectScreen();
+    } catch (error) {
+        hideLoading();
+        console.error(error);
+        if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+            await showCustomAlert("現在のパスワード（一時パスワード）が正しくありません。管理者から伝えられた一時パスワードを、正確に入力してください。", "エラー");
+        } else if (error.code === 'auth/requires-recent-login') {
+            await showCustomAlert("セキュリティのため、一度ログアウトしてから一時パスワードで再度ログインし、もう一度お試しください。", "確認が必要です");
+        } else {
+            await showCustomAlert("設定に失敗しました。", "エラー");
+        }
+    }
+}
+
 async function handleChangeOwnPassword() {
     const currentPw = document.getElementById('change-current-password').value.trim();
     const newPw = document.getElementById('change-new-password').value.trim();
@@ -793,6 +867,19 @@ async function handleLogin() {
         currentUsername = uid;
         isAdminSession = isAdmin;
 
+        // 管理者がパスワードリセットを承認した際に設定される、
+        // 「次回ログイン時は必ずパスワードを変更させる」フラグを確認する。
+        if (!isAdmin) {
+            const userDoc = await db.collection('users').doc(authUid).get();
+            if (userDoc.exists && userDoc.data().mustChangePassword) {
+                hideLoading();
+                btn.disabled = false;
+                btn.innerText = originalLabel;
+                showForceChangePasswordScreen();
+                return;
+            }
+        }
+
         // ★とメモを先に読み込んでキャッシュしておくことで、この後の
         // 画面遷移（教科選択・メニュー・出題など）を通信待ちなしで
         // 一瞬で表示できるようにする。
@@ -855,7 +942,20 @@ async function deleteOwnAccount() {
     if (confirmed) {
         showLoading('削除中...');
         try {
+            const userDoc = await db.collection('users').doc(currentUser).get();
+            const attendanceNumber = userDoc.exists ? userDoc.data().attendanceNumber : null;
+
             await db.collection('users').doc(currentUser).delete();
+
+            if (attendanceNumber !== null && attendanceNumber !== undefined) {
+                await db.collection('system').doc('takenAttendanceNumbers').update({
+                    numbers: firebase.firestore.FieldValue.arrayRemove(Number(attendanceNumber))
+                });
+                await db.collection('system').doc('attendanceDirectory').update({
+                    [`directory.${attendanceNumber}`]: firebase.firestore.FieldValue.delete()
+                });
+            }
+
             const user = auth.currentUser;
             if (user) {
                 await user.delete();
