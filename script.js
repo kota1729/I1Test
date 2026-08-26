@@ -226,6 +226,57 @@ function showLoginScreen() {
     document.getElementById('auth-password').value = '';
 }
 
+function showForgotPasswordScreen() {
+    document.querySelectorAll('.window').forEach(el => el.style.display = 'none');
+    document.getElementById('forgot-password-screen').style.display = 'block';
+
+    const select = document.getElementById('forgot-attendance-number');
+    if (!select.dataset.populated) {
+        for (let i = 1; i <= 39; i++) {
+            const option = document.createElement('option');
+            option.value = i;
+            option.textContent = i + '番';
+            select.appendChild(option);
+        }
+        select.dataset.populated = 'true';
+    }
+    select.value = '';
+    document.getElementById('forgot-userid').value = '';
+}
+
+async function submitPasswordResetRequest() {
+    const attendanceNumber = document.getElementById('forgot-attendance-number').value;
+    const userid = document.getElementById('forgot-userid').value.trim();
+
+    if (!attendanceNumber) { await showCustomAlert("出席番号を選択してください。", "入力エラー"); return; }
+    if (!userid) { await showCustomAlert("ユーザーIDを入力してください。", "入力エラー"); return; }
+
+    const btn = document.getElementById('forgot-submit-btn');
+    const originalLabel = btn.innerText;
+    btn.disabled = true;
+    btn.innerText = '送信中...';
+    showLoading('送信中...');
+
+    try {
+        await db.collection('passwordResetRequests').add({
+            attendanceNumber: Number(attendanceNumber),
+            userid: userid,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        hideLoading();
+        btn.disabled = false;
+        btn.innerText = originalLabel;
+        await showCustomAlert("リクエストを送信しました。担当者から直接ご連絡します。", "送信完了");
+        showLoginScreen();
+    } catch (error) {
+        console.error(error);
+        hideLoading();
+        btn.disabled = false;
+        btn.innerText = originalLabel;
+        await showCustomAlert("送信に失敗しました。通信環境をご確認のうえ、もう一度お試しください。", "エラー");
+    }
+}
+
 let currentUser = null;      // Firestore/Firebase AuthのUID（内部処理用）
 let currentUsername = null;  // 画面表示用のユーザーID
 let isAdminSession = false;
@@ -1058,6 +1109,50 @@ function toggleStarList(originalIdx, btnEl) {
     setSessionStars(currentSubject, myStars);
 }
 
+async function loadPasswordResetRequests() {
+    const tbody = document.getElementById('reset-requests-list');
+    if (!tbody) return;
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#aaa;">読み込み中...</td></tr>`;
+
+    try {
+        const snapshot = await db.collection('passwordResetRequests').orderBy('createdAt', 'desc').get();
+        if (snapshot.empty) {
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#aaa;">現在、リクエストはありません。</td></tr>`;
+            return;
+        }
+        tbody.innerHTML = '';
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const dateStr = data.createdAt ? data.createdAt.toDate().toLocaleString('ja-JP') : '（送信中）';
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="font-size:11px;">${dateStr}</td>
+                <td>${escapeHtml(String(data.attendanceNumber))}番</td>
+                <td>${escapeHtml(data.userid)}</td>
+                <td>
+                    <button class="btn btn-sub" style="padding:5px 8px; font-size:11px;" onclick="markResetRequestHandled('${doc.id}')">対応済みにする</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch (error) {
+        console.error(error);
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#aaa;">読み込みに失敗しました。</td></tr>`;
+    }
+}
+
+async function markResetRequestHandled(requestId) {
+    const confirmed = await showCustomConfirm("このリクエストを、対応済みとして一覧から削除しますか？", "対応済みにする");
+    if (!confirmed) return;
+    try {
+        await db.collection('passwordResetRequests').doc(requestId).delete();
+        await loadPasswordResetRequests();
+    } catch (error) {
+        console.error(error);
+        await showCustomAlert("削除に失敗しました。", "エラー");
+    }
+}
+
 async function showAdminScreen() {
     if (!isAdminSession) return;
     document.querySelectorAll('.window').forEach(el => el.style.display = 'none');
@@ -1066,6 +1161,8 @@ async function showAdminScreen() {
 
     document.getElementById('admin-current-password').value = '';
     document.getElementById('admin-new-password').value = '';
+
+    loadPasswordResetRequests();
 
     const tbody = document.getElementById('admin-user-list');
     tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#aaa;">読み込み中...</td></tr>`;

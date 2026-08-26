@@ -48,7 +48,9 @@
         <div class="link-row">
             <button type="button" class="link-btn" onclick="showRegisterScreen()">新規登録はこちら</button>
         </div>
-        <p class="subtitle" style="margin-top:15px; margin-bottom:0; font-size:12px;">パスワードを忘れた場合は、サイト管理者に直接ご連絡ください。</p>
+        <div class="link-row" style="margin-top:8px;">
+            <button type="button" class="link-btn" onclick="showForgotPasswordScreen()">パスワードを忘れた方はこちら</button>
+        </div>
     </div>
 
     <div class="window" id="register-screen">
@@ -77,6 +79,21 @@
         </div>
         <div class="control-btns" style="margin-bottom: 15px;">
             <button class="btn btn-main" id="register-btn" onclick="handleRegister()">登録する</button>
+            <button class="btn btn-sub" onclick="showLoginScreen()">戻る</button>
+        </div>
+    </div>
+
+    <div class="window" id="forgot-password-screen">
+        <h1>パスワードの再設定リクエスト</h1>
+        <p class="subtitle">出席番号とユーザーIDを入力して送信してください。内容を確認のうえ、担当者から直接ご連絡します。</p>
+        <div class="auth-form">
+            <select id="forgot-attendance-number">
+                <option value="">出席番号を選択してください</option>
+            </select>
+            <input type="text" id="forgot-userid" placeholder="ユーザーID" autocomplete="off">
+        </div>
+        <div class="control-btns" style="margin-bottom: 15px;">
+            <button class="btn btn-main" id="forgot-submit-btn" onclick="submitPasswordResetRequest()">送信</button>
             <button class="btn btn-sub" onclick="showLoginScreen()">戻る</button>
         </div>
     </div>
@@ -223,6 +240,24 @@
                 </thead>
                 <tbody id="admin-user-list"></tbody>
             </table>
+        </div>
+
+        <div class="admin-section" style="border-color: #e67e22;">
+            <h3 style="font-size:15px; color:#e67e22; margin-bottom:10px;">🔑 パスワード再設定リクエスト</h3>
+            <p style="font-size:12px; color:#7f8c8d; margin-bottom:10px;">出席番号・ユーザーIDを確認のうえ、本人と直接連絡を取ってから対応してください。</p>
+            <div style="max-height: 30vh; overflow-y: auto;">
+                <table class="admin-table" id="reset-requests-table">
+                    <thead>
+                        <tr>
+                            <th>受信日時</th>
+                            <th>出席番号</th>
+                            <th>ユーザーID</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reset-requests-list"></tbody>
+                </table>
+            </div>
         </div>
 
         <div class="admin-section" style="border-color: var(--accent);">
