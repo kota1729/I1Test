@@ -323,11 +323,8 @@ async function getUserStars(uid, subjectId) {
     return data.starred[subjectId] || [];
 }
 
-async function setUserStars(uid, subjectId, starsArray, isTargetAdmin) {
-    // 管理者自身のデータは 'stars' フィールドに保存されるため（setSessionStars参照）、
-    // リセット対象が管理者自身の場合はそちらに合わせて書き込む。
-    const field = isTargetAdmin ? 'stars' : 'starred';
-    await db.collection('users').doc(uid).set({ [field]: { [subjectId]: starsArray } }, { merge: true });
+async function setUserStars(uid, subjectId, starsArray) {
+    await db.collection('users').doc(uid).set({ starred: { [subjectId]: starsArray } }, { merge: true });
 }
 
 async function getAdminDoc() {
@@ -465,11 +462,11 @@ async function populateAttendanceNumberOptions() {
 
     const takenNumbers = new Set();
     try {
-        const snapshot = await db.collection('users').get();
-        snapshot.forEach(doc => {
-            const num = doc.data().attendanceNumber;
-            if (num !== undefined && num !== null) takenNumbers.add(Number(num));
-        });
+        // users コレクション全体は未ログイン状態からは読めない設定のため、
+        // 出席番号の使用状況だけを持つ、公開読み取り可能な専用ドキュメントを見る。
+        const doc = await db.collection('system').doc('takenAttendanceNumbers').get();
+        const numbers = doc.exists ? (doc.data().numbers || []) : [];
+        numbers.forEach(n => takenNumbers.add(Number(n)));
     } catch (error) {
         console.error("出席番号の取得に失敗しました:", error);
     }
@@ -526,10 +523,9 @@ async function handleRegister() {
     showLoading('登録中...');
 
     try {
-        const existingSnapshot = await db.collection('users')
-            .where('attendanceNumber', '==', Number(attendanceNumber))
-            .get();
-        if (!existingSnapshot.empty) {
+        const takenDoc = await db.collection('system').doc('takenAttendanceNumbers').get();
+        const takenNumbers = takenDoc.exists ? (takenDoc.data().numbers || []) : [];
+        if (takenNumbers.map(Number).includes(Number(attendanceNumber))) {
             hideLoading();
             btn.disabled = false;
             btn.innerText = originalLabel;
@@ -547,6 +543,13 @@ async function handleRegister() {
             attendanceNumber: Number(attendanceNumber),
             starred: {}
         });
+
+        // 出席番号の使用状況は、未ログイン状態からでも参照できる必要があるため、
+        // 専用の公開ドキュメントにも記録しておく（users コレクション全体は
+        // 未ログイン状態から読めない設定になっているため）。
+        await db.collection('system').doc('takenAttendanceNumbers').set({
+            numbers: firebase.firestore.FieldValue.arrayUnion(Number(attendanceNumber))
+        }, { merge: true });
 
         // system/admin ドキュメントに adminUid がまだ設定されていない場合
         // （ドキュメント自体が存在しない場合、または旧バージョンから残っている
@@ -1069,6 +1072,9 @@ async function showAdminScreen() {
 
     let users = await getUsersData();
     const keys = Object.keys(users);
+    // 管理者自身の★データは users コレクションではなく system/admin ドキュメントの
+    // stars フィールドに保存される（sessionDocRef参照）ため、別途取得しておく。
+    const adminOwnStars = await getAdminStars(currentSubject);
 
     if (keys.length === 0) {
         tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#aaa;">登録されているユーザーはいません。</td></tr>`;
@@ -1080,10 +1086,9 @@ async function showAdminScreen() {
         const username = escapeHtml(users[uid].username || '(不明なユーザー)');
         const attendanceNumber = users[uid].attendanceNumber || '--';
         const isSelf = (uid === currentUser);
-        // 管理者自身のデータは 'stars' フィールドに保存されるため（setSessionStars参照）、
-        // 通常ユーザーの 'starred' フィールドとは別に読み分ける必要がある。
-        const starred = isSelf ? users[uid].stars : users[uid].starred;
-        const starArr = (starred && typeof starred === 'object' && !Array.isArray(starred)) ? (starred[currentSubject] || []) : [];
+        // 管理者自身のデータは system/admin ドキュメントに保存されるため、
+        // 通常ユーザーの users/{uid}.starred とは別に読み分ける必要がある。
+        const starArr = isSelf ? adminOwnStars : ((users[uid].starred && typeof users[uid].starred === 'object' && !Array.isArray(users[uid].starred)) ? (users[uid].starred[currentSubject] || []) : []);
         const starCount = starArr.length;
         const tr = document.createElement('tr');
         tr.innerHTML = `
@@ -1106,9 +1111,14 @@ async function adminResetUserStars(uid, username) {
     const confirmed = await showCustomConfirm(`ユーザー「${username}」の教科「${subjectName}」の★データだけをリセットします。他の教科・他のユーザーには影響しません。よろしいですか？`, "ユーザー別★リセット");
     if (confirmed) {
         showLoading('リセット中...');
-        const isTargetAdmin = (uid === currentUser);
-        await setUserStars(uid, currentSubject, [], isTargetAdmin);
-        if (isTargetAdmin) sessionStars[currentSubject] = [];
+        if (uid === currentUser) {
+            // 管理者自身のデータは system/admin ドキュメントに保存されているため、
+            // そちらをリセットする（users/{uid}側には元々データが存在しない）。
+            await saveAdminStars(currentSubject, []);
+            sessionStars[currentSubject] = [];
+        } else {
+            await setUserStars(uid, currentSubject, []);
+        }
         hideLoading();
         await showCustomAlert(`ユーザー「${username}」の★データ（${subjectName}）をリセットしました。`, "リセット完了");
         await showAdminScreen();
