@@ -210,6 +210,90 @@ function updatePasswordRuleStatus() {
     }
 }
 
+function toggleChangePasswordVisibility(btn, inputId) {
+    const input = document.getElementById(inputId);
+    if (input.type === 'password') {
+        input.type = 'text';
+        btn.innerText = '隠す';
+    } else {
+        input.type = 'password';
+        btn.innerText = '表示';
+    }
+}
+
+function updateChangePasswordRuleStatus() {
+    const pw = document.getElementById('change-new-password').value;
+
+    const checks = {
+        'change-rule-length': pw.length >= 8,
+        'change-rule-number': PASSWORD_HAS_NUMBER_REGEX.test(pw),
+        'change-rule-alpha': PASSWORD_HAS_ALPHA_REGEX.test(pw),
+        'change-rule-charset': pw.length > 0 && PASSWORD_CHARSET_ONLY_REGEX.test(pw)
+    };
+
+    Object.keys(checks).forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.classList.toggle('valid', checks[id]);
+        el.classList.toggle('invalid', !checks[id]);
+    });
+}
+
+function showChangePasswordScreen() {
+    document.querySelectorAll('.window').forEach(el => el.style.display = 'none');
+    document.getElementById('change-password-screen').style.display = 'block';
+    document.getElementById('change-current-password').value = '';
+    document.getElementById('change-new-password').value = '';
+    updateChangePasswordRuleStatus();
+}
+
+async function handleChangeOwnPassword() {
+    const currentPw = document.getElementById('change-current-password').value.trim();
+    const newPw = document.getElementById('change-new-password').value.trim();
+
+    if (!currentPw || !newPw) {
+        await showCustomAlert("現在のパスワードと新しいパスワードの両方を入力してください。", "入力エラー");
+        return;
+    }
+
+    if (!isValidPassword(newPw)) {
+        await showCustomAlert(
+            "パスワードの条件を満たしていません。\n・8文字以上\n・半角の数字とローマ字を両方含む\n・使用できるのは半角英数字のみ（日本語・記号は使用不可）",
+            "パスワードエラー"
+        );
+        return;
+    }
+
+    const confirmed = await showCustomConfirm("パスワードを変更します。よろしいですか？\n変更後は、自動的に一度ログアウトされます。", "確認");
+    if (!confirmed) return;
+
+    showLoading('変更中...');
+    try {
+        const user = auth.currentUser;
+
+        // パスワードの変更はセキュリティ上「最近ログインしたばかり」であることが
+        // 求められるため、現在のパスワードで再認証してから変更する。
+        const credential = firebase.auth.EmailAuthProvider.credential(user.email, currentPw);
+        await user.reauthenticateWithCredential(credential);
+
+        await user.updatePassword(newPw);
+
+        hideLoading();
+        await showCustomAlert("パスワードを更新しました。再度ログインしてください。", "変更完了");
+        handleLogout();
+    } catch (error) {
+        hideLoading();
+        console.error(error);
+        if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+            await showCustomAlert("現在のパスワードが正しくありません。", "変更エラー");
+        } else if (error.code === 'auth/requires-recent-login') {
+            await showCustomAlert("セキュリティのため、一度ログアウトしてから再度ログインし、もう一度お試しください。", "確認が必要です");
+        } else {
+            await showCustomAlert("変更に失敗しました。", "エラー");
+        }
+    }
+}
+
 async function showRegisterScreen() {
     document.querySelectorAll('.window').forEach(el => el.style.display = 'none');
     document.getElementById('register-screen').style.display = 'block';
@@ -262,7 +346,15 @@ async function submitPasswordResetRequest() {
         const directory = dirDoc.exists ? (dirDoc.data().directory || {}) : {};
         const registeredUserid = directory[String(attendanceNumber)];
 
-        if (!registeredUserid || registeredUserid !== userid) {
+        if (!registeredUserid) {
+            hideLoading();
+            btn.disabled = false;
+            btn.innerText = originalLabel;
+            await showCustomAlert("その出席番号で登録されているアカウントが存在しません。入力内容をご確認ください。", "確認エラー");
+            return;
+        }
+
+        if (registeredUserid !== userid) {
             hideLoading();
             btn.disabled = false;
             btn.innerText = originalLabel;
@@ -1202,7 +1294,14 @@ async function showAdminScreen() {
     tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#aaa;">読み込み中...</td></tr>`;
 
     let users = await getUsersData();
-    const keys = Object.keys(users);
+    const keys = Object.keys(users).sort((a, b) => {
+        const numA = users[a].attendanceNumber;
+        const numB = users[b].attendanceNumber;
+        if ((numA === undefined || numA === null) && (numB === undefined || numB === null)) return 0;
+        if (numA === undefined || numA === null) return 1;
+        if (numB === undefined || numB === null) return -1;
+        return Number(numA) - Number(numB);
+    });
     // 管理者自身の★データは users コレクションではなく system/admin ドキュメントの
     // stars フィールドに保存される（sessionDocRef参照）ため、別途取得しておく。
     const adminOwnStars = await getAdminStars(currentSubject);

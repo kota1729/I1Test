@@ -85,7 +85,8 @@
 
     <div class="window" id="forgot-password-screen">
         <h1>パスワードの再設定リクエスト</h1>
-        <p class="subtitle">出席番号とユーザーIDを入力して送信してください。内容を確認のうえ、担当者から直接ご連絡します。</p>
+        <p class="subtitle">
+            出席番号とユーザーIDを入力して送信してください。内容を確認のうえ、担当者から直接ご連絡します。本人確認や再設定作業を手作業で行っているため、対応には少しお時間をいただく場合があります。ご了承ください。</p>
         <div class="auth-form">
             <select id="forgot-attendance-number">
                 <option value="">出席番号を選択してください</option>
@@ -145,6 +146,11 @@
         <button class="btn btn-sub" onclick="resetMyStars()"
             style="width:100%; margin-top:10px; font-size:12px; padding:10px; border: 1px solid #ccc;">
             自分の★（わからない問題）をこの教科分だけリセットする
+        </button>
+
+        <button class="btn btn-sub" onclick="showChangePasswordScreen()"
+            style="width:100%; margin-top:10px; font-size:12px; padding:10px; border: 1px solid #ccc;">
+            パスワードを変更する
         </button>
 
         <button class="btn btn-danger" id="delete-my-account-btn" onclick="deleteOwnAccount()"
@@ -299,6 +305,38 @@
 
         <div class="nav-footer">
             <button class="btn btn-sub" onclick="toMainMenu()" style="width:100%;">メニューへ戻る</button>
+        </div>
+    </div>
+
+    <div class="window" id="change-password-screen">
+        <h1>パスワードの変更</h1>
+        <p class="subtitle">現在のパスワードと、新しいパスワードを入力してください。</p>
+        <div class="auth-form">
+            <div class="password-wrapper">
+                <input type="password" id="change-current-password" placeholder="現在のパスワード" autocomplete="off">
+                <button type="button" class="toggle-pw-btn"
+                    onclick="toggleChangePasswordVisibility(this, 'change-current-password')">表示</button>
+            </div>
+            <div class="password-wrapper">
+                <input type="password" id="change-new-password" placeholder="新しいパスワード" autocomplete="off"
+                    oninput="updateChangePasswordRuleStatus()">
+                <button type="button" class="toggle-pw-btn"
+                    onclick="toggleChangePasswordVisibility(this, 'change-new-password')">表示</button>
+            </div>
+            <div class="pw-rules">
+                <span class="pw-rules-title">パスワードの条件</span>
+                <div class="pw-rule-item" id="change-rule-length"><span class="pw-rule-icon"></span>8文字以上で設定してください</div>
+                <div class="pw-rule-item" id="change-rule-number"><span class="pw-rule-icon"></span>半角の数字（0〜9）を含めてください
+                </div>
+                <div class="pw-rule-item" id="change-rule-alpha"><span class="pw-rule-icon"></span>半角のローマ字（a〜z,
+                    A〜Z）を含めてください</div>
+                <div class="pw-rule-item" id="change-rule-charset"><span
+                        class="pw-rule-icon"></span>使用できるのは半角の英数字のみです（日本語・記号は不可）</div>
+            </div>
+        </div>
+        <div class="control-btns" style="margin-bottom: 15px;">
+            <button class="btn btn-main" id="change-password-btn" onclick="handleChangeOwnPassword()">変更する</button>
+            <button class="btn btn-sub" onclick="toMainMenu()">戻る</button>
         </div>
     </div>
 
