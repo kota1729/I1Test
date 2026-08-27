@@ -129,24 +129,6 @@ function invalidateAdminUidCache() {
     adminUidCache = null;
 }
 
-function toggleAdminPassword(btn, inputId) {
-
-    const input =
-        document.getElementById(inputId);
-
-    if (input.type === "password") {
-
-        input.type = "text";
-        btn.innerText = "隠す";
-
-    } else {
-
-        input.type = "password";
-        btn.innerText = "表示";
-
-    }
-}
-
 function toggleAuthPasswordVisibility(btn) {
     const input = document.getElementById('auth-password');
     if (input.type === 'password') {
@@ -819,6 +801,9 @@ async function handleRegister() {
         showLoginScreen();
     } catch (error) {
         console.error(error);
+        hideLoading();
+        btn.disabled = false;
+        btn.innerText = originalLabel;
         if (error.code === 'auth/email-already-in-use') {
             await showCustomAlert("このユーザーIDは既に使用されています。", "登録エラー");
         } else if (error.code === 'auth/weak-password') {
@@ -1486,13 +1471,10 @@ async function showAdminScreen() {
     document.getElementById('admin-screen').style.display = 'block';
     document.getElementById('admin-subject-name').innerText = getSubjectName(currentSubject);
 
-    document.getElementById('admin-current-password').value = '';
-    document.getElementById('admin-new-password').value = '';
-
     loadPasswordResetRequests();
 
     const tbody = document.getElementById('admin-user-list');
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#aaa;">読み込み中...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#aaa;">読み込み中...</td></tr>`;
 
     let users = await getUsersData();
     const keys = Object.keys(users).sort((a, b) => {
@@ -1508,7 +1490,7 @@ async function showAdminScreen() {
     const adminOwnStars = await getAdminStars(currentSubject);
 
     if (keys.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#aaa;">登録されているユーザーはいません。</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#aaa;">登録されているユーザーはいません。</td></tr>`;
         return;
     }
 
@@ -1525,7 +1507,6 @@ async function showAdminScreen() {
         tr.innerHTML = `
                     <td>${attendanceNumber}番</td>
                     <td><strong>${username}</strong>${isSelf ? ' <span style="color:#8e44ad; font-size:11px;">（自分＝管理者）</span>' : ''}</td>
-                    <td><span style="color:#7f8c8d;">🔒 非公開（暗号化済み）</span></td>
                     <td>${starCount} 問</td>
                     <td>
                         <button class="btn btn-sub" style="padding:5px 8px; font-size:11px;" onclick="adminResetUserStars('${uid}', '${username}')">★リセット</button>
@@ -1578,54 +1559,5 @@ async function adminResetAllUsersStars() {
         hideLoading();
         await showCustomAlert(`すべてのユーザー（管理者含む）の★データ（${subjectName}）をリセットしました。`, "一括リセット完了");
         await showAdminScreen();
-    }
-}
-
-async function changeAdminCredentials() {
-    if (!isAdminSession) return;
-
-    const currentPw = document.getElementById('admin-current-password').value.trim();
-    const newPw = document.getElementById('admin-new-password').value.trim();
-
-    if (!currentPw || !newPw) {
-        await showCustomAlert("現在のパスワードと新しいパスワードの両方を入力してください。", "入力エラー");
-        return;
-    }
-
-    if (!isValidPassword(newPw)) {
-        await showCustomAlert(
-            "パスワードの条件を満たしていません。\n・8文字以上\n・半角の数字とローマ字を両方含む\n・使用できるのは半角英数字のみ（日本語・記号は使用不可）",
-            "パスワードエラー"
-        );
-        return;
-    }
-
-    const confirmed = await showCustomConfirm("管理者のパスワードを変更します。よろしいですか？\n変更後は、自動的に一度ログアウトされます。", "確認");
-    if (!confirmed) return;
-
-    showLoading('変更中...');
-    try {
-        const user = auth.currentUser;
-
-        // パスワードの変更はセキュリティ上「最近ログインしたばかり」であることが
-        // 求められるため、現在のパスワードで再認証してから変更する。
-        const credential = firebase.auth.EmailAuthProvider.credential(user.email, currentPw);
-        await user.reauthenticateWithCredential(credential);
-
-        await user.updatePassword(newPw);
-
-        hideLoading();
-        await showCustomAlert("管理者のパスワードを更新しました。再度ログインしてください。", "変更完了");
-        handleLogout();
-    } catch (error) {
-        hideLoading();
-        console.error(error);
-        if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-            await showCustomAlert("現在のパスワードが正しくありません。", "変更エラー");
-        } else if (error.code === 'auth/requires-recent-login') {
-            await showCustomAlert("セキュリティのため、一度ログアウトしてから再度ログインし、もう一度お試しください。", "確認が必要です");
-        } else {
-            await showCustomAlert("変更に失敗しました。", "エラー");
-        }
     }
 }
