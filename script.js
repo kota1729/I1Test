@@ -754,6 +754,23 @@ async function handleRegister() {
             return;
         }
 
+        // ユーザーIDの重複も、念のため事前にチェックしておく（Firebase Authentication側でも
+        // 最終的にブロックされるが、その場合より分かりやすいメッセージを先に出すため）。
+        try {
+            const dirDoc = await db.collection('system').doc('attendanceDirectory').get();
+            const directory = dirDoc.exists ? (dirDoc.data().directory || {}) : {};
+            const usedUserIds = Object.values(directory);
+            if (usedUserIds.includes(uid)) {
+                hideLoading();
+                btn.disabled = false;
+                btn.innerText = originalLabel;
+                await showCustomAlert("そのユーザーIDは、すでに別の出席番号で使用されています。別のユーザーIDを入力してください。", "登録エラー");
+                return;
+            }
+        } catch (checkError) {
+            console.error("ユーザーIDの重複確認に失敗しました:", checkError);
+        }
+
         // パスワードはFirestoreには一切保存せず、Firebase Authenticationに
         // 安全に管理させる（ユーザーIDはダミーのメールアドレスに変換して使用）。
         const email = usernameToEmail(uid);
