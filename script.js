@@ -272,6 +272,11 @@ async function handleForceChangePassword() {
         return;
     }
 
+    if (currentUsername && currentUsername.toLowerCase() === newPw.toLowerCase()) {
+        await showCustomAlert("パスワードにユーザーIDと同じ文字列は使用できません。別のパスワードを設定してください。", "パスワードエラー");
+        return;
+    }
+
     showLoading('設定中...');
     try {
         const user = auth.currentUser;
@@ -317,6 +322,11 @@ async function handleChangeOwnPassword() {
             "パスワードの条件を満たしていません。\n・8文字以上\n・半角の数字とローマ字を両方含む\n・使用できるのは半角英数字のみ（日本語・記号は使用不可）",
             "パスワードエラー"
         );
+        return;
+    }
+
+    if (currentUsername && currentUsername.toLowerCase() === newPw.toLowerCase()) {
+        await showCustomAlert("パスワードにユーザーIDと同じ文字列は使用できません。別のパスワードを設定してください。", "パスワードエラー");
         return;
     }
 
@@ -724,6 +734,11 @@ async function handleRegister() {
             "パスワードの条件を満たしていません。\n・8文字以上\n・半角の数字とローマ字を両方含む\n・使用できるのは半角英数字のみ（日本語・記号は使用不可）",
             "パスワードエラー"
         );
+        return;
+    }
+
+    if (uid.toLowerCase() === pw.toLowerCase()) {
+        await showCustomAlert("パスワードにユーザーIDと同じ文字列は使用できません。別のパスワードを設定してください。", "パスワードエラー");
         return;
     }
 
@@ -1526,7 +1541,7 @@ async function showAdminScreen() {
                     <td><strong>${username}</strong>${isSelf ? ' <span style="color:#8e44ad; font-size:11px;">（自分＝管理者）</span>' : ''}</td>
                     <td>${starCount} 問</td>
                     <td>
-                        <button class="btn btn-sub" style="padding:5px 8px; font-size:11px;" onclick="adminResetUserStars('${uid}', '${username}')">★リセット</button>
+                        <button class="btn btn-sub" style="white-space: nowrap;padding:5px 8px; font-size:11px;" onclick="adminResetUserStars('${uid}', '${username}')">★リセット</button>
                     </td>
                 `;
         tbody.appendChild(tr);

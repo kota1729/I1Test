@@ -551,6 +551,7 @@ h1 {
 }
 
 .admin-table th {
+    white-space: nowrap;
     background-color: #f2f2f2;
 }
 
