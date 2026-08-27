@@ -1330,52 +1330,153 @@ function toggleStarList(originalIdx, btnEl) {
 }
 
 async function loadPasswordResetRequests() {
-    const tbody = document.getElementById('reset-requests-list');
-    if (!tbody) return;
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#aaa;">読み込み中...</td></tr>`;
+    const pendingBody = document.getElementById('reset-requests-list');
+    const approvedBody = document.getElementById('approved-requests-list');
+    if (!pendingBody || !approvedBody) return;
+    pendingBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#aaa;">読み込み中...</td></tr>`;
+    approvedBody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#aaa;">読み込み中...</td></tr>`;
 
     try {
         const snapshot = await db.collection('passwordResetRequests').orderBy('createdAt', 'desc').get();
-        if (snapshot.empty) {
-            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#aaa;">現在、リクエストはありません。</td></tr>`;
-            return;
+
+        const pendingDocs = snapshot.docs.filter(doc => doc.data().status !== 'approved');
+        const approvedDocs = snapshot.docs.filter(doc => doc.data().status === 'approved');
+
+        // 未対応リクエストの一覧
+        if (pendingDocs.length === 0) {
+            pendingBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#aaa;">現在、リクエストはありません。</td></tr>`;
+        } else {
+            pendingBody.innerHTML = '';
+            pendingDocs.forEach(doc => {
+                const data = doc.data();
+                const dateStr = data.createdAt ? data.createdAt.toDate().toLocaleString('ja-JP') : '（送信中）';
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="font-size:11px;">${dateStr}</td>
+                    <td>${escapeHtml(String(data.attendanceNumber))}番</td>
+                    <td>${escapeHtml(data.userid)}</td>
+                    <td>
+                        <button class="btn btn-main" style="padding:5px 8px; font-size:11px; background:#27ae60;" onclick="resolveResetRequest('${doc.id}', true)">許可</button>
+                    </td>
+                    <td>
+                        <button class="btn btn-danger" style="padding:5px 8px; font-size:11px;" onclick="resolveResetRequest('${doc.id}', false)">拒否</button>
+                    </td>
+                `;
+                pendingBody.appendChild(tr);
+            });
         }
-        tbody.innerHTML = '';
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            const dateStr = data.createdAt ? data.createdAt.toDate().toLocaleString('ja-JP') : '（送信中）';
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td style="font-size:11px;">${dateStr}</td>
-                <td>${escapeHtml(String(data.attendanceNumber))}番</td>
-                <td>${escapeHtml(data.userid)}</td>
-                <td>
-                    <button class="btn btn-main" style="padding:5px 8px; font-size:11px; background:#27ae60;" onclick="resolveResetRequest('${doc.id}', true)">許可</button>
-                </td>
-                <td>
-                    <button class="btn btn-danger" style="padding:5px 8px; font-size:11px;" onclick="resolveResetRequest('${doc.id}', false)">拒否</button>
-                </td>
-            `;
-            tbody.appendChild(tr);
-        });
+
+        // 許可済み・対応待ちリクエストの一覧（状態を自動判定して表示する）
+        if (approvedDocs.length === 0) {
+            approvedBody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#aaa;">現在、対応待ちのリクエストはありません。</td></tr>`;
+        } else {
+            approvedBody.innerHTML = '';
+            for (const doc of approvedDocs) {
+                const data = doc.data();
+                const dateStr = data.approvedAt ? data.approvedAt.toDate().toLocaleString('ja-JP') : '（処理中）';
+
+                let statusHtml = '';
+                let showClearBtn = false;
+
+                if (!data.scriptCompletedAt) {
+                    statusHtml = `<span style="color:#e67e22; font-weight:bold;">⚠️ スクリプト未実行</span>`;
+                } else {
+                    const userDoc = await db.collection('users').doc(data.targetUid).get();
+                    const mustChange = userDoc.exists && userDoc.data().mustChangePassword;
+                    if (mustChange) {
+                        statusHtml = `<span style="color:#e67e22; font-weight:bold;">🔶 発行済み・本人のログイン待ち</span>`;
+                    } else {
+                        statusHtml = `<span style="color:#27ae60; font-weight:bold;">✅ 完了</span>`;
+                        showClearBtn = true;
+                    }
+                }
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="font-size:11px;">${dateStr}<br>${escapeHtml(String(data.attendanceNumber))}番 / ${escapeHtml(data.userid)}<br><span style="font-size:9px; color:#aaa;" title="reset-password.js の requestId に使用">ID: ${doc.id}</span></td>
+                    <td>${statusHtml}</td>
+                    <td colspan="2">
+                        ${showClearBtn ? `<button class="btn btn-sub" style="padding:5px 8px; font-size:11px;" onclick="clearApprovedResetRequest('${doc.id}')">リストから消す</button>` : ''}
+                    </td>
+                `;
+                approvedBody.appendChild(tr);
+            }
+        }
     } catch (error) {
         console.error(error);
-        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#aaa;">読み込みに失敗しました。</td></tr>`;
+        pendingBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#aaa;">読み込みに失敗しました。</td></tr>`;
+        approvedBody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#aaa;">読み込みに失敗しました。</td></tr>`;
     }
 }
 
 async function resolveResetRequest(requestId, approved) {
-    const confirmText = approved
-        ? "このリクエストを「許可」しますか？（本人確認が済んでいることを確認してから許可してください。実際のパスワード変更は、別途手元のスクリプトで行ってください。）"
-        : "このリクエストを「拒否」しますか？（一覧から削除されます。）";
-    const confirmed = await showCustomConfirm(confirmText, approved ? "リクエストを許可" : "リクエストを拒否");
+    if (!approved) {
+        const confirmed = await showCustomConfirm("このリクエストを「拒否」しますか？（一覧から削除されます。）", "リクエストを拒否");
+        if (!confirmed) return;
+        try {
+            await db.collection('passwordResetRequests').doc(requestId).delete();
+            await loadPasswordResetRequests();
+        } catch (error) {
+            console.error(error);
+            await showCustomAlert("処理に失敗しました。", "エラー");
+        }
+        return;
+    }
+
+    const confirmed = await showCustomConfirm(
+        "このリクエストを「許可」しますか？（本人確認が済んでいることを確認してから許可してください。）\n許可すると「許可済み・対応待ち」リストに移動します。実際のパスワード変更は、別途 reset-password.js を実行してください。",
+        "リクエストを許可"
+    );
+    if (!confirmed) return;
+
+    showLoading('処理中...');
+    try {
+        const reqDoc = await db.collection('passwordResetRequests').doc(requestId).get();
+        if (!reqDoc.exists) {
+            hideLoading();
+            await showCustomAlert("リクエストが見つかりませんでした。", "エラー");
+            return;
+        }
+        const reqData = reqDoc.data();
+
+        const userSnapshot = await db.collection('users')
+            .where('username', '==', reqData.userid)
+            .where('attendanceNumber', '==', Number(reqData.attendanceNumber))
+            .get();
+
+        if (userSnapshot.empty) {
+            hideLoading();
+            await showCustomAlert("対象のアカウントが見つかりませんでした（すでに削除された可能性があります）。手動でご確認ください。", "確認エラー");
+            return;
+        }
+
+        const targetUid = userSnapshot.docs[0].id;
+
+        await db.collection('passwordResetRequests').doc(requestId).update({
+            status: 'approved',
+            approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            targetUid: targetUid
+        });
+
+        hideLoading();
+        await showCustomAlert("許可しました。「許可済み・対応待ち」リストに移動しました。", "許可完了");
+        await loadPasswordResetRequests();
+    } catch (error) {
+        hideLoading();
+        console.error(error);
+        await showCustomAlert("処理に失敗しました。", "エラー");
+    }
+}
+
+async function clearApprovedResetRequest(requestId) {
+    const confirmed = await showCustomConfirm("このリクエストをリストから消しますか？（完了しているものを整理する目的のみで、状態には影響しません。）", "リストから消す");
     if (!confirmed) return;
     try {
         await db.collection('passwordResetRequests').doc(requestId).delete();
         await loadPasswordResetRequests();
     } catch (error) {
         console.error(error);
-        await showCustomAlert("処理に失敗しました。", "エラー");
+        await showCustomAlert("削除に失敗しました。", "エラー");
     }
 }
 
