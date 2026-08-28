@@ -1003,6 +1003,25 @@ async function resetMyStars() {
     }
 }
 
+async function clearMyMemos() {
+    const subjectName = getSubjectName(currentSubject);
+    const confirmed = await showCustomConfirm(`あなたが「${subjectName}」で書いたメモを、すべてまとめて消去します。他の教科のメモには影響しません。この操作は取り消せません。よろしいですか？`, "メモの全消去");
+    if (confirmed) {
+        showLoading('消去中...');
+        try {
+            await sessionDocRef().update({ [`memos.${currentSubject}`]: {} });
+            sessionMemos[currentSubject] = {};
+            hideLoading();
+            await showCustomAlert("この教科のメモをすべて消去しました。", "消去完了");
+            await showMainMenu();
+        } catch (error) {
+            hideLoading();
+            console.error(error);
+            await showCustomAlert("消去に失敗しました。", "エラー");
+        }
+    }
+}
+
 function showSubjectScreen() {
     document.querySelectorAll('.window').forEach(el => el.style.display = 'none');
     document.getElementById('subject-screen').style.display = 'block';
@@ -1541,7 +1560,8 @@ async function showAdminScreen() {
                     <td><strong>${username}</strong>${isSelf ? ' <span style="color:#8e44ad; font-size:11px;">（自分＝管理者）</span>' : ''}</td>
                     <td>${starCount} 問</td>
                     <td>
-                        <button class="btn btn-sub" style="white-space: nowrap;padding:5px 8px; font-size:11px;" onclick="adminResetUserStars('${uid}', '${username}')">★リセット</button>
+                        <button class="btn btn-sub" style="padding:5px 8px; font-size:11px; margin-bottom:4px;" onclick="adminResetUserStars('${uid}', '${username}')">★リセット</button>
+                        <button class="btn btn-sub" style="padding:5px 8px; font-size:11px;" onclick="adminClearUserMemos('${uid}', '${username}')">メモ消去</button>
                     </td>
                 `;
         tbody.appendChild(tr);
@@ -1566,6 +1586,30 @@ async function adminResetUserStars(uid, username) {
         hideLoading();
         await showCustomAlert(`ユーザー「${username}」の★データ（${subjectName}）をリセットしました。`, "リセット完了");
         await showAdminScreen();
+    }
+}
+
+async function adminClearUserMemos(uid, username) {
+    if (!isAdminSession) return;
+
+    const subjectName = getSubjectName(currentSubject);
+    const confirmed = await showCustomConfirm(`ユーザー「${username}」の教科「${subjectName}」のメモを、すべてまとめて消去します。他の教科・他のユーザーには影響しません。この操作は取り消せません。よろしいですか？`, "ユーザー別メモ全消去");
+    if (confirmed) {
+        showLoading('消去中...');
+        try {
+            const docRef = (uid === currentUser)
+                ? db.collection('system').doc('admin')
+                : db.collection('users').doc(uid);
+            await docRef.update({ [`memos.${currentSubject}`]: {} });
+            if (uid === currentUser) sessionMemos[currentSubject] = {};
+            hideLoading();
+            await showCustomAlert(`ユーザー「${username}」のメモ（${subjectName}）をすべて消去しました。`, "消去完了");
+            await showAdminScreen();
+        } catch (error) {
+            hideLoading();
+            console.error(error);
+            await showCustomAlert("消去に失敗しました。", "エラー");
+        }
     }
 }
 

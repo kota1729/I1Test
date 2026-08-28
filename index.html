@@ -35,7 +35,7 @@
     <div id="sync-toast-wrap" class="sync-toast-wrap"></div>
 
     <div class="window" id="login-screen" style="display: block;">
-        <h1>I1テスト対策システム ログイン</h1>
+        <h1>一問一答システム ログイン</h1>
         <p class="subtitle">ログインするか、新しいアカウントを作成してください。</p>
         <div class="auth-form">
             <input type="text" id="auth-userid" placeholder="ユーザーID" autocomplete="off">
@@ -150,8 +150,13 @@
             自分の★（わからない問題）をこの教科分だけリセットする
         </button>
 
-        <button class="btn btn-sub" onclick="showChangePasswordScreen()"
+        <button class="btn btn-sub" onclick="clearMyMemos()"
             style="width:100%; margin-top:10px; font-size:12px; padding:10px; border: 1px solid #ccc;">
+            自分のメモをこの教科分だけまとめて消去する
+        </button>
+
+        <button class="btn btn-danger" onclick="showChangePasswordScreen()"
+            style="width:100%; margin-top:10px; font-size:12px; padding:10px;">
             パスワードを変更する
         </button>
 
