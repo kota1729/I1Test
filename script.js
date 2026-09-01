@@ -1721,3 +1721,59 @@ async function adminResetAllUsersStars() {
         await showAdminScreen();
     }
 }
+// --- キーボード操作サポート ---
+// ・ログイン / 新規登録 / パスワード再設定リクエスト画面：Enterキーで各画面の
+// 　メインボタン（ログイン・登録する・送信）を押したことにする。
+// ・クイズ画面（モード1: 順番出題、モード3: ランダム出題）：
+// 　右矢印キー＝次の問題、左矢印キー＝前の問題、Enterキー＝答え（付箋）を開く。
+document.addEventListener('keydown', function (e) {
+    const target = e.target;
+    const tag = target.tagName;
+
+    // --- ログイン画面 ---
+    if (e.key === 'Enter') {
+        const loginScreen = document.getElementById('login-screen');
+        if (loginScreen && loginScreen.contains(target) && tag !== 'BUTTON' && tag !== 'TEXTAREA') {
+            e.preventDefault();
+            document.getElementById('login-btn').click();
+            return;
+        }
+
+        // --- 新規登録画面 ---
+        const registerScreen = document.getElementById('register-screen');
+        if (registerScreen && registerScreen.contains(target) && tag !== 'BUTTON' && tag !== 'TEXTAREA') {
+            e.preventDefault();
+            document.getElementById('register-btn').click();
+            return;
+        }
+
+        // --- パスワードを忘れた方画面 ---
+        const forgotScreen = document.getElementById('forgot-password-screen');
+        if (forgotScreen && forgotScreen.contains(target) && tag !== 'BUTTON' && tag !== 'TEXTAREA') {
+            e.preventDefault();
+            document.getElementById('forgot-submit-btn').click();
+            return;
+        }
+    }
+
+    // --- クイズ画面（モード1: 順番出題／モード3: ランダム出題）---
+    const quizScreen = document.getElementById('quiz-screen');
+    if (quizScreen && quizScreen.style.display === 'block' && (currentMode === 1 || currentMode === 3)) {
+        // メモ欄などに入力中は、矢印キーやEnterキーの本来の役割（文字入力・改行）
+        // を優先し、独自のキー操作を割り込ませない。
+        if (tag === 'TEXTAREA' || tag === 'INPUT' || tag === 'SELECT') return;
+
+        if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            document.getElementById('next-btn').click();
+        } else if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            if (!document.getElementById('prev-btn').disabled) {
+                document.getElementById('prev-btn').click();
+            }
+        } else if (e.key === 'Enter' && tag !== 'BUTTON') {
+            e.preventDefault();
+            document.getElementById('quiz-a-container').click();
+        }
+    }
+});
