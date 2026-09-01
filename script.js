@@ -953,7 +953,7 @@ async function handleLogin() {
 
 // ゲストとして開始する。アカウント登録は行わず、Firebaseへの接続やデータの
 // 保存も一切行わない（★・メモ・パスワード変更・アカウント削除は画面上からも除去する）。
-function handleGuestLogin() {
+async function handleGuestLogin() {
     currentUser = null;
     currentUsername = 'ゲスト';
     isAdminSession = false;
@@ -962,6 +962,11 @@ function handleGuestLogin() {
     // ゲストは保存先を持たないため、キャッシュは空のまま「読み込み済み」扱いにする。
     resetSessionCache();
     sessionDataReady = true;
+
+    await showCustomAlert(
+        "ゲストで始めると、わからない問題（★）の保存やメモなど、個人でしか使えない機能はご利用いただけません。",
+        "ゲストとして開始します"
+    );
 
     showSubjectScreen();
 }
