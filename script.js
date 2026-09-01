@@ -222,6 +222,7 @@ function updateChangePasswordRuleStatus() {
 }
 
 function showChangePasswordScreen() {
+    if (isGuestSession) return;
     document.querySelectorAll('.window').forEach(el => el.style.display = 'none');
     document.getElementById('change-password-screen').style.display = 'block';
     document.getElementById('change-current-password').value = '';
@@ -309,6 +310,7 @@ async function handleForceChangePassword() {
 }
 
 async function handleChangeOwnPassword() {
+    if (isGuestSession) return;
     const currentPw = document.getElementById('change-current-password').value.trim();
     const newPw = document.getElementById('change-new-password').value.trim();
 
@@ -450,6 +452,7 @@ async function submitPasswordResetRequest() {
 let currentUser = null;      // Firestore/Firebase AuthのUID（内部処理用）
 let currentUsername = null;  // 画面表示用のユーザーID
 let isAdminSession = false;
+let isGuestSession = false;  // ゲストとして開始したセッションかどうか（★・メモ・パスワード変更・アカウント削除は不可）
 let currentSubject = null;
 let currentMode = 1;
 let activeQuestions = [];
@@ -464,7 +467,19 @@ function getSubjectName(subjectId) {
 }
 function getActiveSubjectQuestions() {
     const subj = (window.QUIZ_SUBJECTS || {})[currentSubject];
-    return subj ? subj.questions : [];
+    if (!subj) return [];
+
+    // 各問題オブジェクトに、元の配列内での位置(_origIdx)を一度だけ付与しておく。
+    // ★(わからない問題登録)やメモの保存は、この番号を使って問題を識別している。
+    // 以前は問題文(q)の中身が一致するかどうかで探していたため、
+    // 「この国はどこ？」のように同じ問題文を複数の問題(画像違いなど)で
+    // 使うと、常に配列内で最初に見つかった1問だけが対象になってしまっていた。
+    // 位置そのものを識別子にすることで、問題文が重複していても正しく区別できる。
+    subj.questions.forEach((q, idx) => {
+        if (q._origIdx === undefined) q._origIdx = idx;
+    });
+
+    return subj.questions;
 }
 
 function showCustomAlert(message, title = "通知") {
@@ -936,11 +951,27 @@ async function handleLogin() {
     }
 }
 
+// ゲストとして開始する。アカウント登録は行わず、Firebaseへの接続やデータの
+// 保存も一切行わない（★・メモ・パスワード変更・アカウント削除は画面上からも除去する）。
+function handleGuestLogin() {
+    currentUser = null;
+    currentUsername = 'ゲスト';
+    isAdminSession = false;
+    isGuestSession = true;
+
+    // ゲストは保存先を持たないため、キャッシュは空のまま「読み込み済み」扱いにする。
+    resetSessionCache();
+    sessionDataReady = true;
+
+    showSubjectScreen();
+}
+
 function handleLogout() {
     auth.signOut();
     currentUser = null;
     currentUsername = null;
     isAdminSession = false;
+    isGuestSession = false;
     currentSubject = null;
     resetSessionCache();
     document.querySelectorAll('.window').forEach(el => el.style.display = 'none');
@@ -950,6 +981,7 @@ function handleLogout() {
 }
 
 async function deleteOwnAccount() {
+    if (isGuestSession) return;
     if (isAdminSession) {
         await showCustomAlert("管理者アカウントは絶対に削除できません。", "エラー");
         return;
@@ -994,6 +1026,7 @@ async function deleteOwnAccount() {
 }
 
 async function resetMyStars() {
+    if (isGuestSession) return;
     const subjectName = getSubjectName(currentSubject);
     const confirmed = await showCustomConfirm(`あなたが「${subjectName}」で登録した★（わからない問題）のマークをすべて解除してリセットします。他の教科の★には影響しません。よろしいですか？`, "★のリセット");
     if (confirmed) {
@@ -1004,6 +1037,7 @@ async function resetMyStars() {
 }
 
 async function clearMyMemos() {
+    if (isGuestSession) return;
     const subjectName = getSubjectName(currentSubject);
     const confirmed = await showCustomConfirm(`あなたが「${subjectName}」で書いたメモを、すべてまとめて消去します。他の教科のメモには影響しません。この操作は取り消せません。よろしいですか？`, "メモの全消去");
     if (confirmed) {
@@ -1070,6 +1104,10 @@ async function showMainMenu() {
 
     const adminBtn = document.getElementById('admin-panel-btn');
     const deleteMyAccBtn = document.getElementById('delete-my-account-btn');
+    const resetStarsBtn = document.getElementById('reset-stars-btn');
+    const clearMemosBtn = document.getElementById('clear-memos-btn');
+    const changePasswordBtn = document.getElementById('menu-change-password-btn');
+    const starModeBtn = document.getElementById('menu-star-btn');
 
     if (isAdminSession) {
         adminBtn.style.display = 'block';
@@ -1079,11 +1117,24 @@ async function showMainMenu() {
         deleteMyAccBtn.style.display = 'block';
     }
 
-    const starModeBtn = document.getElementById('menu-star-btn');
-    const starCount = getSessionStars(currentSubject).length;
+    if (isGuestSession) {
+        // ゲストは個人アカウントに紐づくデータを持たないため、
+        // それらに依存する機能は画面から取り除く。
+        deleteMyAccBtn.style.display = 'none';
+        resetStarsBtn.style.display = 'none';
+        clearMemosBtn.style.display = 'none';
+        changePasswordBtn.style.display = 'none';
+        starModeBtn.style.display = 'none';
+    } else {
+        resetStarsBtn.style.display = 'block';
+        clearMemosBtn.style.display = 'block';
+        changePasswordBtn.style.display = 'block';
+        starModeBtn.style.display = 'block';
 
-    starModeBtn.innerText = `★ 限定モード (現在 ${starCount} 問)`;
-    starModeBtn.disabled = starCount === 0;
+        const starCount = getSessionStars(currentSubject).length;
+        starModeBtn.innerText = `★ 限定モード (現在 ${starCount} 問)`;
+        starModeBtn.disabled = starCount === 0;
+    }
 }
 
 async function toMainMenu() {
@@ -1126,6 +1177,7 @@ async function startMode(modeNum) {
         document.getElementById('quiz-title').innerText = `${subjectName} - ランダム実力テスト`;
         await setupQuizScreen();
     } else if (modeNum === 4) {
+        if (isGuestSession) return;
         activeQuestions = questions.filter((_, idx) => myStars.includes(idx));
         document.getElementById('quiz-title').innerText = `${subjectName} - ★ わからない問題 復習テスト`;
         await setupQuizScreen();
@@ -1151,33 +1203,55 @@ async function showQuestion() {
     document.getElementById('quiz-question').innerText = current.q;
     document.getElementById('quiz-answer').innerText = current.a;
 
-    const starBtn = document.getElementById('quiz-star');
-    const questions = getActiveSubjectQuestions();
-    const originalIdx = questions.findIndex(q => q.q === current.q);
-
-    // キャッシュから同期的に取得するため、問題を送る/戻るたびに
-    // サーバーへ読みに行くことがなく、遅延なく次の問題を表示できる。
-    const myStars = getSessionStars(currentSubject);
-    const myMemos = getSessionMemos(currentSubject);
-
-    if (myStars.includes(originalIdx)) {
-        starBtn.classList.add('active');
+    const imgEl = document.getElementById('quiz-question-img');
+    if (current.img) {
+        imgEl.src = current.img;
+        imgEl.style.display = 'block';
     } else {
-        starBtn.classList.remove('active');
+        imgEl.removeAttribute('src');
+        imgEl.style.display = 'none';
     }
 
-    const memoEl = document.getElementById('quiz-memo');
-    memoEl.value = myMemos[originalIdx] || '';
-    memoEl.dataset.idx = originalIdx;
-    const memoStatusEl = document.getElementById('quiz-memo-status');
-    if (memoStatusEl) {
-        memoStatusEl.textContent = '';
-        memoStatusEl.classList.remove('saved');
+    const starBtn = document.getElementById('quiz-star');
+    const memoBoxEl = document.querySelector('#quiz-screen .memo-box');
+
+    if (isGuestSession) {
+        // ゲストは★・メモのデータを保存できないため、機能自体を非表示にする。
+        starBtn.style.display = 'none';
+        if (memoBoxEl) memoBoxEl.style.display = 'none';
+    } else {
+        starBtn.style.display = '';
+        if (memoBoxEl) memoBoxEl.style.display = 'block';
+
+        // getActiveSubjectQuestions()を呼ぶことで_origIdxの付与を保証してから、
+        // current自身が持つ_origIdxを使う（同じ問題文が複数あってもズレない）。
+        getActiveSubjectQuestions();
+        const originalIdx = current._origIdx;
+
+        // キャッシュから同期的に取得するため、問題を送る/戻るたびに
+        // サーバーへ読みに行くことがなく、遅延なく次の問題を表示できる。
+        const myStars = getSessionStars(currentSubject);
+        const myMemos = getSessionMemos(currentSubject);
+
+        if (myStars.includes(originalIdx)) {
+            starBtn.classList.add('active');
+        } else {
+            starBtn.classList.remove('active');
+        }
+
+        const memoEl = document.getElementById('quiz-memo');
+        memoEl.value = myMemos[originalIdx] || '';
+        memoEl.dataset.idx = originalIdx;
+        const memoStatusEl = document.getElementById('quiz-memo-status');
+        if (memoStatusEl) {
+            memoStatusEl.textContent = '';
+            memoStatusEl.classList.remove('saved');
+        }
+        const memoContentEl = document.getElementById('memo-content');
+        const memoToggleLabelEl = document.getElementById('memo-toggle-label');
+        if (memoContentEl) memoContentEl.style.display = 'none';
+        if (memoToggleLabelEl) memoToggleLabelEl.textContent = 'タップして表示';
     }
-    const memoContentEl = document.getElementById('memo-content');
-    const memoToggleLabelEl = document.getElementById('memo-toggle-label');
-    if (memoContentEl) memoContentEl.style.display = 'none';
-    if (memoToggleLabelEl) memoToggleLabelEl.textContent = 'タップして表示';
 
     const total = activeQuestions.length;
     document.getElementById('quiz-count').innerText = `第 ${currentIndex + 1} 問 / ${total} 問`;
@@ -1196,12 +1270,14 @@ function toggleMemoVisibility() {
 }
 
 function onQuizMemoInput() {
+    if (isGuestSession) return;
     const memoEl = document.getElementById('quiz-memo');
     const idx = Number(memoEl.dataset.idx);
     scheduleMemoSave('quiz', () => saveMemoValue(idx, memoEl.value), 'quiz-memo-status');
 }
 
 async function saveQuizMemoNow() {
+    if (isGuestSession) return;
     const memoEl = document.getElementById('quiz-memo');
     const idx = Number(memoEl.dataset.idx);
     if (memoSaveTimers['quiz']) clearTimeout(memoSaveTimers['quiz']);
@@ -1221,9 +1297,10 @@ async function saveMemoValue(idx, text) {
 // ★ボタンは押した瞬間に見た目を切り替え、保存は裏側で非同期に行う
 // （＝しばらく星にならず固まって見える、という遅延を無くす）。
 function toggleStarCurrent() {
+    if (isGuestSession) return;
     const current = activeQuestions[currentIndex];
-    const questions = getActiveSubjectQuestions();
-    const originalIdx = questions.findIndex(q => q.q === current.q);
+    getActiveSubjectQuestions();
+    const originalIdx = current._origIdx;
     const starBtn = document.getElementById('quiz-star');
 
     const myStars = getSessionStars(currentSubject);
@@ -1295,30 +1372,18 @@ async function setupListScreen() {
 
     const questions = getActiveSubjectQuestions();
 
-    // キャッシュから同期的に取得（通信なし）。
-    const myStars = getSessionStars(currentSubject);
-    const myMemos = getSessionMemos(currentSubject);
+    // キャッシュから同期的に取得（通信なし）。ゲストは★・メモのデータを
+    // 持たないため、そもそもキャッシュを参照せず機能自体をUIから外す。
+    const myStars = isGuestSession ? [] : getSessionStars(currentSubject);
+    const myMemos = isGuestSession ? {} : getSessionMemos(currentSubject);
 
     // 問題数が多い教科でもカクつかないよう、要素をDOMに逐次追加するのではなく
     // 文字列としてまとめて組み立ててから一度だけ描画する。
     const htmlParts = questions.map((item, idx) => {
         const isStarred = myStars.includes(idx);
-        const starDisplay = `<button class="star-btn ${isStarred ? 'active' : ''}" onclick="toggleStarList(${idx}, this)">★</button>`;
+        const starDisplay = isGuestSession ? '' : `<button class="star-btn ${isStarred ? 'active' : ''}" onclick="toggleStarList(${idx}, this)">★</button>`;
         const memoText = escapeHtml(myMemos[idx] || '');
-
-        return `
-                    <div class="qa-card">
-                        <div class="card-header">
-                            <div class="q-text">問 ${idx + 1}: ${item.q}</div>
-                            ${starDisplay}
-                        </div>
-                        <div class="a-container" onclick="toggleAnswer(this)">
-                            <div class="a-text">${item.a}</div>
-                            <div class="fusen">
-                                <span class="fusen-icon">👆</span>
-                                <span class="fusen-main">付箋をタップして答えを見る</span>
-                            </div>
-                        </div>
+        const memoBoxHtml = isGuestSession ? '' : `
                         <div class="memo-box">
                             <div class="memo-header">
                                 <span class="memo-header-icon">✎</span>
@@ -1326,7 +1391,23 @@ async function setupListScreen() {
                                 <span class="memo-status" id="list-memo-status-${idx}"></span>
                             </div>
                             <textarea class="memo-textarea" id="list-memo-${idx}" placeholder="気づいたこと・覚え方のコツなどを書いておこう" oninput="onListMemoInput(${idx})" onblur="saveListMemoNow(${idx})">${memoText}</textarea>
+                        </div>`;
+
+        return `
+                    <div class="qa-card">
+                        <div class="card-header">
+                            <div class="q-text">問 ${idx + 1}: ${item.q}</div>
+                            ${starDisplay}
                         </div>
+                        ${item.img ? `<img src="${item.img}" class="q-image" alt="問題の画像">` : ''}
+                        <div class="a-container" onclick="toggleAnswer(this)">
+                            <div class="a-text">${item.a}</div>
+                            <div class="fusen">
+                                <span class="fusen-icon">👆</span>
+                                <span class="fusen-main">付箋をタップして答えを見る</span>
+                            </div>
+                        </div>
+                        ${memoBoxHtml}
                     </div>
                 `;
     });
@@ -1336,11 +1417,13 @@ async function setupListScreen() {
 }
 
 function onListMemoInput(idx) {
+    if (isGuestSession) return;
     const memoEl = document.getElementById('list-memo-' + idx);
     scheduleMemoSave('list-' + idx, () => saveMemoValue(idx, memoEl.value), 'list-memo-status-' + idx);
 }
 
 async function saveListMemoNow(idx) {
+    if (isGuestSession) return;
     const memoEl = document.getElementById('list-memo-' + idx);
     const key = 'list-' + idx;
     if (memoSaveTimers[key]) clearTimeout(memoSaveTimers[key]);
@@ -1353,6 +1436,7 @@ async function saveListMemoNow(idx) {
 }
 
 function toggleStarList(originalIdx, btnEl) {
+    if (isGuestSession) return;
     const myStars = getSessionStars(currentSubject);
     const foundIdx = myStars.indexOf(originalIdx);
     if (foundIdx > -1) {

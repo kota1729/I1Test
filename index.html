@@ -47,6 +47,9 @@
         <div class="control-btns" style="margin-bottom: 15px;">
             <button class="btn btn-main" id="login-btn" onclick="handleLogin()">ログイン</button>
         </div>
+        <div class="control-btns" style="margin-bottom: 15px;">
+            <button class="btn btn-sub" id="guest-login-btn" onclick="handleGuestLogin()">ゲストとして始める（登録不要）</button>
+        </div>
         <div class="link-row">
             <button type="button" class="link-btn" onclick="showRegisterScreen()">新規登録はこちら</button>
         </div>
@@ -145,17 +148,17 @@
             他の教科を選びなおす
         </button>
 
-        <button class="btn btn-sub" onclick="resetMyStars()"
+        <button class="btn btn-sub" id="reset-stars-btn" onclick="resetMyStars()"
             style="width:100%; margin-top:10px; font-size:12px; padding:10px; border: 1px solid #ccc;">
             自分の★（わからない問題）をこの教科分だけリセットする
         </button>
 
-        <button class="btn btn-sub" onclick="clearMyMemos()"
+        <button class="btn btn-sub" id="clear-memos-btn" onclick="clearMyMemos()"
             style="width:100%; margin-top:10px; font-size:12px; padding:10px; border: 1px solid #ccc;">
             自分のメモをこの教科分だけまとめて消去する
         </button>
 
-        <button class="btn btn-danger" onclick="showChangePasswordScreen()"
+        <button class="btn btn-danger" id="menu-change-password-btn" onclick="showChangePasswordScreen()"
             style="width:100%; margin-top:10px; font-size:12px; padding:10px;">
             パスワードを変更する
         </button>
@@ -181,6 +184,7 @@
                 <div class="q-text" id="quiz-question">問題文がここに表示されます。</div>
                 <button class="star-btn" id="quiz-star" onclick="toggleStarCurrent()">★</button>
             </div>
+            <img id="quiz-question-img" class="q-image" style="display:none;" alt="問題の画像">
             <div class="a-container" id="quiz-a-container" onclick="toggleAnswer(this)">
                 <div class="a-text" id="quiz-answer">正解データ</div>
                 <div class="fusen">
@@ -369,6 +373,7 @@
 
     <script src="subjects/joho_shori.js"></script>
     <script src="subjects/kentei.js"></script>
+    <script src="subjects/kokyo.js"></script>
 
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
